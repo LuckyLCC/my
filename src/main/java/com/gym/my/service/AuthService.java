@@ -76,6 +76,11 @@ public class AuthService {
         result.put("name", employee.getName());
         result.put("role", employee.getRole());
         result.put("expiresIn", SESSION_TIMEOUT_MINUTES * 60); // 秒
+        // 返回权限信息
+        result.put("memberCreate", employee.getMemberCreate() != null && employee.getMemberCreate() == 1);
+        result.put("memberRead", employee.getMemberRead() != null && employee.getMemberRead() == 1);
+        result.put("memberUpdate", employee.getMemberUpdate() != null && employee.getMemberUpdate() == 1);
+        result.put("memberDelete", employee.getMemberDelete() != null && employee.getMemberDelete() == 1);
         
         return result;
     }

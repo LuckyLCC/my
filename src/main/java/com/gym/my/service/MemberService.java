@@ -196,9 +196,10 @@ public class MemberService {
     }
     
     /**
-     * 获取会员续卡历史
+     * 获取会员续卡历史（包含首次办卡和续卡记录）
      */
     public List<TransactionRecord> getRenewHistory(Long memberId) {
-        return transactionRecordMapper.findByMemberIdAndType(memberId, "RENEW");
+        // 返回该会员的所有交易记录（NEW和RENEW），按时间倒序排列
+        return transactionRecordMapper.findByMemberId(memberId);
     }
 }

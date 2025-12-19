@@ -16,6 +16,12 @@ public class AdminInterceptor implements HandlerInterceptor {
             return true;
         }
         
+        // GET 请求到 /api/employees 允许所有已登录用户访问（用于会员管理显示员工姓名）
+        String path = request.getRequestURI();
+        if ("GET".equals(request.getMethod()) && "/api/employees".equals(path)) {
+            return true; // 允许所有已登录用户查看员工列表
+        }
+        
         Employee employee = (Employee) request.getAttribute("currentEmployee");
         
         if (employee == null || !"ADMIN".equals(employee.getRole())) {

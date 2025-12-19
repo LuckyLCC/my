@@ -21,6 +21,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/api/auth/login");
         
         // 权限拦截器 - 仅管理员接口
+        // 注意：/api/employees 的 GET 请求在 AdminInterceptor 中特殊处理，允许所有已登录用户访问
         registry.addInterceptor(adminInterceptor)
                 .addPathPatterns("/api/employees/**", "/api/commission-rules/**");
     }

@@ -3,6 +3,7 @@ package com.gym.my.controller;
 import com.gym.my.dto.ApiResponse;
 import com.gym.my.entity.Employee;
 import com.gym.my.service.EmployeeService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,7 +43,12 @@ public class EmployeeController {
     }
     
     @PostMapping
-    public ApiResponse<Employee> createEmployee(@RequestBody Employee employee) {
+    public ApiResponse<Employee> createEmployee(@RequestBody Employee employee, HttpServletRequest request) {
+        // 检查管理员权限
+        Employee currentEmployee = (Employee) request.getAttribute("currentEmployee");
+        if (currentEmployee == null || !"ADMIN".equals(currentEmployee.getRole())) {
+            return ApiResponse.error("权限不足，仅管理员可创建员工");
+        }
         try {
             Employee created = employeeService.createEmployee(employee);
             created.setPassword(null);
@@ -53,7 +59,12 @@ public class EmployeeController {
     }
     
     @PutMapping("/{id}")
-    public ApiResponse<Employee> updateEmployee(@PathVariable Long id, @RequestBody Employee employee) {
+    public ApiResponse<Employee> updateEmployee(@PathVariable Long id, @RequestBody Employee employee, HttpServletRequest request) {
+        // 检查管理员权限
+        Employee currentEmployee = (Employee) request.getAttribute("currentEmployee");
+        if (currentEmployee == null || !"ADMIN".equals(currentEmployee.getRole())) {
+            return ApiResponse.error("权限不足，仅管理员可更新员工");
+        }
         try {
             employee.setId(id);
             Employee updated = employeeService.updateEmployee(employee);
@@ -65,7 +76,12 @@ public class EmployeeController {
     }
     
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteEmployee(@PathVariable Long id) {
+    public ApiResponse<Void> deleteEmployee(@PathVariable Long id, HttpServletRequest request) {
+        // 检查管理员权限
+        Employee currentEmployee = (Employee) request.getAttribute("currentEmployee");
+        if (currentEmployee == null || !"ADMIN".equals(currentEmployee.getRole())) {
+            return ApiResponse.error("权限不足，仅管理员可删除员工");
+        }
         try {
             employeeService.deleteEmployee(id);
             return ApiResponse.success("删除成功", null);

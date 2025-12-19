@@ -115,14 +115,15 @@ public interface TransactionRecordMapper {
             "ct.name as cardTypeName, " +
             "tr.amount as amount, " +
             "tr.transaction_date as transactionDate, " +
-            "tr.transaction_type as transactionType " +
+            "tr.transaction_type as transactionType, " +
+            "COALESCE(tr.created_at, tr.transaction_date) as createdAt " +
             "FROM transaction_record tr " +
             "LEFT JOIN member m ON tr.member_id = m.id " +
             "LEFT JOIN card_type ct ON tr.card_type_id = ct.id " +
             "WHERE tr.employee_id = #{employeeId} " +
             "AND DATE_FORMAT(tr.transaction_date, '%Y-%m') = #{month} " +
             "AND (tr.transaction_type = 'NEW' OR tr.transaction_type = 'RENEW') " +
-            "ORDER BY tr.transaction_date DESC, tr.created_at DESC")
+            "ORDER BY COALESCE(tr.created_at, tr.transaction_date) DESC")
     @Results({
         @Result(property = "memberId", column = "memberId"),
         @Result(property = "memberName", column = "memberName"),
@@ -130,7 +131,9 @@ public interface TransactionRecordMapper {
         @Result(property = "cardTypeId", column = "cardTypeId"),
         @Result(property = "cardTypeName", column = "cardTypeName"),
         @Result(property = "amount", column = "amount"),
-        @Result(property = "transactionDate", column = "transactionDate")
+        @Result(property = "transactionDate", column = "transactionDate"),
+        @Result(property = "transactionType", column = "transactionType"),
+        @Result(property = "createdAt", column = "createdAt", javaType = java.time.LocalDateTime.class)
     })
     List<com.gym.my.dto.CardMemberInfo> getCardMemberDetails(@Param("employeeId") Long employeeId, 
                                                                @Param("month") String month);
@@ -170,4 +173,28 @@ public interface TransactionRecordMapper {
     })
     List<TransactionRecord> findByMemberIdAndType(@Param("memberId") Long memberId, 
                                                  @Param("transactionType") String transactionType);
+    
+    /**
+     * 根据会员ID查询所有交易记录（包含NEW和RENEW）
+     */
+    @Select("SELECT tr.*, " +
+            "m.name as memberName, m.phone as memberPhone, " +
+            "ct.name as cardTypeName, " +
+            "e.name as employeeName " +
+            "FROM transaction_record tr " +
+            "LEFT JOIN member m ON tr.member_id = m.id " +
+            "LEFT JOIN card_type ct ON tr.card_type_id = ct.id " +
+            "LEFT JOIN employee e ON tr.employee_id = e.id " +
+            "WHERE tr.member_id = #{memberId} " +
+            "AND (tr.transaction_type = 'NEW' OR tr.transaction_type = 'RENEW') " +
+            "ORDER BY tr.transaction_date DESC, tr.created_at DESC")
+    @Results({
+        @Result(property = "member", column = "member_id",
+                one = @One(select = "com.gym.my.mapper.MemberMapper.findById")),
+        @Result(property = "cardType", column = "card_type_id",
+                one = @One(select = "com.gym.my.mapper.CardTypeMapper.findById")),
+        @Result(property = "employee", column = "employee_id",
+                one = @One(select = "com.gym.my.mapper.EmployeeMapper.findById"))
+    })
+    List<TransactionRecord> findByMemberId(@Param("memberId") Long memberId);
 }
