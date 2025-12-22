@@ -88,7 +88,8 @@ public interface TransactionRecordMapper {
             "e.name as employeeName, " +
             "DATE_FORMAT(tr.transaction_date, '%Y-%m') as month, " +
             "COUNT(*) as cardCount, " +
-            "SUM(tr.amount) as totalCardAmount " +
+            "SUM(tr.amount) as totalCardAmount, " +
+            "SUM(tr.commission_amount) as totalCommissionAmount " +
             "FROM transaction_record tr " +
             "LEFT JOIN employee e ON tr.employee_id = e.id " +
             "WHERE DATE_FORMAT(tr.transaction_date, '%Y-%m') = #{month} " +
@@ -100,7 +101,8 @@ public interface TransactionRecordMapper {
         @Result(property = "employeeName", column = "employeeName"),
         @Result(property = "month", column = "month"),
         @Result(property = "cardCount", column = "cardCount"),
-        @Result(property = "totalCardAmount", column = "totalCardAmount")
+        @Result(property = "totalCardAmount", column = "totalCardAmount"),
+        @Result(property = "totalCommissionAmount", column = "totalCommissionAmount")
     })
     List<com.gym.my.dto.EmployeeCardStats> getEmployeeCardStatsByMonth(@Param("month") String month);
     

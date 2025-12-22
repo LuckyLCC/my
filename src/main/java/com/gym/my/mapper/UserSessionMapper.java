@@ -27,4 +27,17 @@ public interface UserSessionMapper {
     
     @Delete("DELETE FROM user_session WHERE employee_id = #{employeeId}")
     int deleteByEmployeeId(Long employeeId);
+    
+    @Select("SELECT * FROM user_session WHERE employee_id = #{employeeId} LIMIT 1")
+    UserSession findByEmployeeId(Long employeeId);
+    
+    @Update("UPDATE user_session SET token = #{token}, expires_at = #{expiresAt} WHERE employee_id = #{employeeId}")
+    int updateByEmployeeId(@Param("employeeId") Long employeeId, @Param("token") String token, @Param("expiresAt") LocalDateTime expiresAt);
+    
+    // 使用INSERT ... ON DUPLICATE KEY UPDATE避免死锁
+    @Insert("INSERT INTO user_session (employee_id, token, expires_at) " +
+            "VALUES (#{employeeId}, #{token}, #{expiresAt}) " +
+            "ON DUPLICATE KEY UPDATE token = #{token}, expires_at = #{expiresAt}")
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insertOrUpdate(UserSession session);
 }

@@ -111,7 +111,7 @@
         if (!window.ElementPlus) throw new Error('Element Plus 未加载（window.ElementPlus 不存在）');
         if (!window.axios) throw new Error('Axios 未加载（window.axios 不存在）');
 
-        const { createApp, ref, reactive, computed, watch, onMounted, defineComponent, h } = window.Vue;
+        const { createApp, ref, reactive, computed, watch, onMounted, nextTick, defineComponent, h } = window.Vue;
 
     // ----------------------------
     // Axios global config
@@ -121,21 +121,31 @@
       withCredentials: true
     });
 
+    // 使用响应式变量跟踪token状态
+    const tokenState = ref(localStorage.getItem('token') || '');
+    
     function getToken() {
-      return localStorage.getItem('token') || '';
+      return tokenState.value || localStorage.getItem('token') || '';
     }
     function setToken(token) {
-      localStorage.setItem('token', token || '');
+      const tokenValue = token || '';
+      localStorage.setItem('token', tokenValue);
+      tokenState.value = tokenValue; // 更新响应式状态
     }
     function clearToken() {
       localStorage.removeItem('token');
+      tokenState.value = ''; // 更新响应式状态
     }
 
     http.interceptors.request.use((config) => {
-      const token = getToken();
+      // 确保每次都从最新的tokenState或localStorage读取token
+      const token = tokenState.value || localStorage.getItem('token') || '';
       if (token) {
         config.headers = config.headers || {};
         config.headers['Authorization'] = 'Bearer ' + token;
+        console.log('[Request Interceptor] 添加Authorization header，token:', token.substring(0, 20) + '...');
+      } else {
+        console.warn('[Request Interceptor] 没有token，请求可能失败');
       }
       return config;
     });
@@ -305,6 +315,15 @@
             return;
           }
           
+          // 检查token是否存在
+          const token = getToken();
+          if (!token) {
+            console.warn(`[loadList] 没有token，跳过加载: module="${props.module?.key}"`);
+            rows.value = [];
+            errorText.value = '未登录：请先登录后再加载数据';
+            return;
+          }
+          
           // 对于会员模块，检查查看权限
           const moduleKey = props.module?.key || '';
           if (moduleKey === 'members' && props.currentUser) {
@@ -321,7 +340,7 @@
           try {
             const moduleKey = props.module?.key || 'unknown';
             const url = props.module?.list?.url || '';
-            console.log(`[loadList] 加载数据: module="${moduleKey}", url="${url}"`);
+            console.log(`[loadList] 加载数据: module="${moduleKey}", url="${url}", token存在: ${!!token}`);
             let res;
             if (props.module.list && props.module.list.method === 'GET') {
               res = await http.get(props.module.list.url, { params: props.module.list.params ? props.module.list.params(listParams) : listParams });
@@ -354,9 +373,19 @@
               await props.onRefreshEmployees();
             }
           } catch (e) {
+            const status = e?.response?.status;
             const serverMsg = e?.response?.data?.message;
             errorText.value = serverMsg || e?.message || String(e);
-            console.error(`[loadList] 加载失败: module="${props.module?.key}", error=`, e);
+            console.error(`[loadList] 加载失败: module="${props.module?.key}", error=`, e, 'status:', status);
+            
+            // 如果是401错误，清除token并触发重新登录
+            if (status === 401) {
+              console.warn(`[loadList] 认证失败，清除token: module="${props.module?.key}"`);
+              const currentToken = getToken();
+              if (currentToken) {
+                clearTokenInComponent();
+              }
+            }
           } finally {
             loading.value = false;
           }
@@ -381,9 +410,10 @@
           errorText.value = '';
           loading.value = true;
           try {
-            const payload = props.module.create && props.module.create.payload
+            let payload = props.module.create && props.module.create.payload
               ? props.module.create.payload(createForm, { currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes })
               : { ...createForm };
+            
             const res = await http.post(props.module.create.url, payload);
             const body = res.data || {};
             if (body.code !== 200) throw new Error(body.message || '新增失败');
@@ -426,9 +456,10 @@
           loading.value = true;
           try {
             const row = editingRow.value || {};
-            const payload = props.module.update && props.module.update.payload
+            let payload = props.module.update && props.module.update.payload
               ? props.module.update.payload(editForm, row, { currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes })
               : { ...editForm };
+            
             const url = props.module.update.url(row);
             const res = await http.put(url, payload);
             const body = res.data || {};
@@ -735,18 +766,91 @@
           await loadList();
         });
 
+        async function exportExcel(moduleKey) {
+          try {
+            const m = props.module;
+            if (!m) return;
+            
+            let url = '';
+            const params = new URLSearchParams();
+            
+            if (moduleKey === 'transactions') {
+              // 导出交易明细
+              url = '/api/financial/export/transactions';
+              if (listParams.value.employeeId) params.append('employeeId', listParams.value.employeeId);
+              if (listParams.value.month) params.append('month', listParams.value.month);
+              if (listParams.value.transactionType) params.append('transactionType', listParams.value.transactionType);
+            } else if (moduleKey === 'cardSummary') {
+              // 导出提成统计（使用月份参数）
+              url = '/api/financial/export/commission-stats';
+              const month = listParams.value.month || dayjs().format('YYYY-MM');
+              params.append('month', month);
+            } else {
+              ElementPlus.ElMessage.warning('该模块不支持导出');
+              return;
+            }
+            
+            const queryString = params.toString();
+            const fullUrl = `http://localhost:8080${url}${queryString ? '?' + queryString : ''}`;
+            const token = localStorage.getItem('token') || '';
+            
+            // 使用fetch下载文件
+            const response = await fetch(fullUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error(`导出失败: ${response.status} ${response.statusText}`);
+            }
+            
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            
+            // 从Content-Disposition头获取文件名，或使用默认名称
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'export.xlsx';
+            if (contentDisposition) {
+              const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+              if (filenameMatch && filenameMatch[1]) {
+                filename = filenameMatch[1].replace(/['"]/g, '');
+                // 处理UTF-8编码的文件名
+                if (filename.startsWith('UTF-8\'\'')) {
+                  filename = decodeURIComponent(filename.replace(/^UTF-8''/, ''));
+                }
+              }
+            }
+            
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            
+            ElementPlus.ElMessage.success('导出成功');
+          } catch (e) {
+            console.error('[exportExcel] 导出失败:', e);
+            ElementPlus.ElMessage.error(e?.message || '导出失败');
+          }
+        }
+
         return {
           loading, rows, errorText,
           createDialogVisible, createForm, createFormRef,
           editDialogVisible, editForm,
           listParams,
-          canCreate, canDelete, canUpdate, isReadOnly,
+          canCreate, canDelete, canUpdate, canRead, isReadOnly,
           loadList, openCreate, submitCreate, openEdit, submitEdit, doDelete,
           doCheckin, openCheckinHistory,
           checkinHistoryVisible, checkinHistory, currentCheckinMember, checkinLoading,
           openRenew, submitRenew, openRenewHistory,
           renewDialogVisible, renewForm, renewLoading, currentRenewMember,
           renewHistoryVisible, renewHistory, renewHistoryLoading,
+          exportExcel,
           openCardDetail,
           cardDetailVisible, cardDetailList, currentCardDetailEmployee,
           summaryInfo,
@@ -793,7 +897,13 @@
                 });
               }),
               h(ElementPlus.ElButton, { type: 'primary', onClick: this.loadList }, () => '刷新'),
-              this.canCreate ? h(ElementPlus.ElButton, { type: 'success', onClick: this.openCreate }, () => '新增') : null
+              this.canCreate ? h(ElementPlus.ElButton, { type: 'success', onClick: this.openCreate }, () => '新增') : null,
+              // Excel导出按钮（仅财务统计相关模块显示）
+              (m.key === 'transactions' || m.key === 'cardSummary' ? h(ElementPlus.ElButton, { 
+                type: 'warning', 
+                icon: 'Download',
+                onClick: () => this.exportExcel(m.key)
+              }, () => '导出Excel') : null)
             ])
           ]),
 
@@ -951,7 +1061,7 @@
                     style: 'border-radius: 4px; font-weight: 500;'
                   }, () => '删除') : null)
                 ].flat().filter(Boolean))
-              }) : null)
+              }) : null
             ].filter(Boolean)
           }),
 
@@ -1276,13 +1386,31 @@
         const authVersion = ref(0);
         const cardTypes = ref([]);
         const employees = ref([]);
+        
+        // 使用全局的tokenState（在组件外部定义），确保Vue能正确追踪
+        // 注意：tokenState是在全局作用域定义的，这里直接使用
+        
+        // 组件内部的token管理函数，同时更新全局tokenState
+        function setTokenInComponent(token) {
+          const tokenValue = token || '';
+          localStorage.setItem('token', tokenValue);
+          tokenState.value = tokenValue; // 更新全局响应式状态
+        }
+        function clearTokenInComponent() {
+          localStorage.removeItem('token');
+          tokenState.value = ''; // 更新全局响应式状态
+        }
 
         async function loadCardTypes() {
-          if (!getToken()) {
+          const token = getToken();
+          if (!token) {
+            console.warn('[loadCardTypes] 没有token，跳过加载');
             cardTypes.value = [];
             return;
           }
+          
           try {
+            console.log('[loadCardTypes] 开始加载卡种，token:', token.substring(0, 20) + '...');
             const res = await http.get('/api/card-types');
             const body = res.data || {};
             if (body.code === 200 && Array.isArray(body.data)) {
@@ -1291,19 +1419,38 @@
               const filtered = body.data.filter(x => x && x.status !== 0);
               console.log('[loadCardTypes] 过滤后的卡种列表:', filtered);
               cardTypes.value = filtered;
+            } else {
+              console.warn('[loadCardTypes] 响应格式异常:', body);
+              cardTypes.value = [];
             }
           } catch (e) {
             console.error('[loadCardTypes] 加载卡种失败:', e);
-            // ignore; UI can still work with raw id
+            const status = e?.response?.status;
+            if (status === 401) {
+              console.warn('[loadCardTypes] 认证失败，可能需要重新登录');
+              // 401错误会被全局拦截器处理，这里只记录日志
+              // 清除token，触发重新登录
+              const currentToken = getToken();
+              if (currentToken) {
+                console.warn('[loadCardTypes] 清除无效token，准备重新登录');
+                clearTokenInComponent();
+              }
+            }
+            // 设置空数组，避免UI错误
+            cardTypes.value = [];
           }
         }
 
         async function loadEmployees() {
-          if (!getToken()) {
+          const token = getToken();
+          if (!token) {
+            console.warn('[loadEmployees] 没有token，跳过加载');
             employees.value = [];
             return;
           }
+          
           try {
+            console.log('[loadEmployees] 开始加载员工列表，token:', token.substring(0, 20) + '...');
             const res = await http.get('/api/employees');
             const body = res.data || {};
             console.log('[loadEmployees] 后端返回的员工列表:', body.data);
@@ -1312,10 +1459,28 @@
               const filtered = body.data.filter(x => x && x.status !== 0);
               console.log('[loadEmployees] 过滤后的员工列表:', filtered);
               employees.value = filtered;
+            } else {
+              console.warn('[loadEmployees] 响应格式异常:', body);
+              employees.value = [];
             }
           } catch (e) {
             console.error('[loadEmployees] 加载员工列表失败:', e);
-            // ignore; UI can still work with raw id
+            const status = e?.response?.status;
+            if (status === 401) {
+              console.warn('[loadEmployees] 认证失败，可能需要重新登录');
+              // 401错误会被全局拦截器处理，这里只记录日志
+              // 清除token，触发重新登录
+              const currentToken = getToken();
+              if (currentToken) {
+                console.warn('[loadEmployees] 清除无效token，准备重新登录');
+                clearTokenInComponent();
+              }
+            } else if (status === 403) {
+              console.warn('[loadEmployees] 权限不足，非管理员用户无法访问员工列表');
+              // 非管理员用户可能无法访问，这是正常的
+            }
+            // 设置空数组，避免UI错误
+            employees.value = [];
           }
         }
 
@@ -1556,8 +1721,8 @@
               { key: 'cardCount', label: '开卡数量', minWidth: 120 },
               { key: 'totalCardAmount', label: '开卡金额', minWidth: 120, value: (row) => row?.totalCardAmount ? `¥${Number(row.totalCardAmount).toFixed(2)}` : '¥0.00' },
               { key: 'commissionAmount', label: '提成金额', minWidth: 120, value: (row) => {
-                const amount = Number(row?.totalCardAmount || 0);
-                const commission = amount * 0.02; // 2%提成
+                // 使用后端返回的提成金额，如果没有则显示0
+                const commission = Number(row?.totalCommissionAmount || 0);
                 return `¥${commission.toFixed(2)}`;
               }},
               { 
@@ -1650,15 +1815,48 @@
         async function doLogin() {
           loginLoading.value = true;
           try {
+            console.log('[doLogin] 开始登录，用户名:', loginForm.username);
             const res = await http.post('/api/auth/login', {
               username: loginForm.username,
               password: loginForm.password
             });
+            console.log('[doLogin] 登录响应:', res);
             const body = res.data || {};
-            if (body.code !== 200) throw new Error(body.message || '登录失败');
+            console.log('[doLogin] 响应体:', body);
+            
+            if (body.code !== 200) {
+              const errorMsg = body.message || '登录失败';
+              console.error('[doLogin] 登录失败:', errorMsg, body);
+              throw new Error(errorMsg);
+            }
+            
             const data = body.data || {};
-            setToken(data.token || '');
-            authVersion.value++;
+            console.log('[doLogin] 登录数据:', data);
+            
+            if (!data.token) {
+              console.error('[doLogin] Token缺失，响应数据:', data);
+              throw new Error('登录成功但未返回Token，请检查后端响应');
+            }
+            
+            // 先更新token（这会触发响应式更新和watch）
+            const tokenValue = data.token || '';
+            if (!tokenValue) {
+              throw new Error('登录成功但未返回Token，请检查后端响应');
+            }
+            
+            // 同步更新token到localStorage和响应式状态
+            setTokenInComponent(tokenValue);
+            
+            // 验证token是否已正确设置
+            const savedToken = getToken();
+            if (!savedToken || savedToken !== tokenValue) {
+              console.error('[doLogin] Token设置失败，期望:', tokenValue.substring(0, 20) + '...', '实际:', savedToken ? savedToken.substring(0, 20) + '...' : 'empty');
+              throw new Error('Token设置失败，请重试');
+            }
+            
+            console.log('[doLogin] Token已保存并验证，tokenState.value:', tokenState.value ? tokenState.value.substring(0, 20) + '...' : 'empty');
+            
+            // 更新用户信息
             currentUser.username = data.username || loginForm.username;
             currentUser.name = data.name || '';
             currentUser.role = data.role || '';
@@ -1668,14 +1866,127 @@
             currentUser.memberRead = (data.memberRead === true || data.memberRead === 1) || data.role === 'ADMIN';
             currentUser.memberUpdate = (data.memberUpdate === true || data.memberUpdate === 1) || data.role === 'ADMIN';
             currentUser.memberDelete = (data.memberDelete === true || data.memberDelete === 1) || data.role === 'ADMIN';
+            console.log('[doLogin] 用户信息已更新:', currentUser);
+            
+            // 等待watch触发和响应式更新完成
+            await nextTick();
+            
+            // 关闭登录对话框（在更新token之后，这样render函数会重新执行）
             loginDialogVisible.value = false;
+            
+            // 再次等待DOM更新，确保token已同步到请求拦截器
+            await nextTick();
+            
+            // 显示成功消息
             ElementPlus.ElMessage.success('登录成功');
-            await loadCardTypes();
-            await loadEmployees();
+            
+            // 再次验证token，确保在发送请求前token可用
+            const finalToken = getToken();
+            if (!finalToken) {
+              console.error('[doLogin] 警告：在发送请求前token丢失');
+              throw new Error('Token验证失败，请重新登录');
+            }
+            
+            // 异步加载数据，不阻塞登录流程
+            // 使用setTimeout确保token已完全同步到请求拦截器
+            setTimeout(() => {
+              Promise.all([
+                loadCardTypes().catch(e => {
+                  console.error('[doLogin] 加载卡种失败:', e);
+                  // 如果是401错误，可能是token问题，尝试重新验证
+                  if (e?.response?.status === 401) {
+                    console.warn('[doLogin] 加载卡种时遇到401错误，可能是token问题');
+                  }
+                }),
+                loadEmployees().catch(e => {
+                  console.error('[doLogin] 加载员工失败:', e);
+                  // 如果是401错误，可能是token问题，尝试重新验证
+                  if (e?.response?.status === 401) {
+                    console.warn('[doLogin] 加载员工时遇到401错误，可能是token问题');
+                  }
+                })
+              ]).then(() => {
+                console.log('[doLogin] 初始数据加载完成');
+              });
+            }, 100); // 给一个小延迟，确保token已同步
           } catch (e) {
-            ElementPlus.ElMessage.error(e?.message || String(e));
+            console.error('[doLogin] 登录异常:', e);
+            let errorMsg = '登录失败，请检查用户名和密码';
+            
+            // 处理不同类型的错误
+            if (e?.response) {
+              // 有响应但状态码不是2xx
+              const responseData = e.response.data;
+              if (responseData?.message) {
+                errorMsg = responseData.message;
+              } else if (e.response.status === 401) {
+                errorMsg = '用户名或密码错误';
+              } else if (e.response.status === 500) {
+                errorMsg = '服务器内部错误，请稍后重试';
+              } else {
+                errorMsg = `请求失败 (${e.response.status})`;
+              }
+            } else if (e?.request) {
+              // 请求已发出但没有收到响应
+              if (e.code === 'ERR_NETWORK' || e.message?.includes('Network Error') || e.message?.includes('ERR_EMPTY_RESPONSE')) {
+                errorMsg = '无法连接到服务器，请确保后端服务已启动 (http://localhost:8080)';
+              } else {
+                errorMsg = '网络请求失败，请检查网络连接';
+              }
+            } else if (e?.message) {
+              // 其他错误
+              errorMsg = e.message;
+            }
+            
+            console.error('[doLogin] 错误详情:', {
+              message: errorMsg,
+              error: e,
+              response: e?.response,
+              request: e?.request,
+              status: e?.response?.status,
+              data: e?.response?.data,
+              code: e?.code
+            });
+            ElementPlus.ElMessage.error(errorMsg);
           } finally {
             loginLoading.value = false;
+          }
+        }
+
+        // 验证token并恢复用户信息
+        async function validateToken() {
+          if (!getToken()) {
+            return false;
+          }
+          try {
+            const res = await http.get('/api/auth/me');
+            const body = res.data || {};
+            if (body.code === 200 && body.data) {
+              const data = body.data;
+              currentUser.username = data.username || '';
+              currentUser.name = data.name || '';
+              currentUser.role = data.role || '';
+              currentUser.employeeId = data.employeeId || null;
+              currentUser.memberCreate = (data.memberCreate === true || data.memberCreate === 1) || data.role === 'ADMIN';
+              currentUser.memberRead = (data.memberRead === true || data.memberRead === 1) || data.role === 'ADMIN';
+              currentUser.memberUpdate = (data.memberUpdate === true || data.memberUpdate === 1) || data.role === 'ADMIN';
+              currentUser.memberDelete = (data.memberDelete === true || data.memberDelete === 1) || data.role === 'ADMIN';
+              console.log('[validateToken] 用户信息已恢复:', currentUser);
+              return true;
+            } else {
+              console.warn('[validateToken] 验证失败，响应:', body);
+              clearTokenInComponent();
+              return false;
+            }
+          } catch (e) {
+            console.error('[validateToken] 验证token失败:', e);
+            const status = e?.response?.status;
+            if (status === 401) {
+              // Token无效，清除并显示登录对话框
+              clearTokenInComponent();
+              openLogin();
+            }
+            return false;
           }
         }
 
@@ -1683,7 +1994,7 @@
           try {
             await http.post('/api/auth/logout');
           } catch { /* ignore */ }
-          clearToken();
+          clearTokenInComponent();
           authVersion.value++;
           currentUser.username = '';
           currentUser.name = '';
@@ -1702,7 +2013,14 @@
           loginDialogVisible.value = true;
         }
 
-        const tokenPresent = computed(() => !!getToken());
+        // 使用响应式的tokenState
+        const tokenPresent = computed(() => !!tokenState.value);
+        
+        // 监听tokenState变化，确保组件重新渲染
+        watch(tokenState, (newVal, oldVal) => {
+          console.log('[watch tokenState] 变化:', { oldVal, newVal });
+          authVersion.value++; // 强制触发组件更新
+        });
         const userLabel = computed(() => {
           if (!tokenPresent.value) return '未登录';
           const name = currentUser.name || currentUser.username || '已登录';
@@ -1716,6 +2034,18 @@
           (err) => {
             const status = err?.response?.status;
             if (status === 401) {
+              // 清除token和用户信息
+              clearToken();
+              // 清除当前用户信息
+              currentUser.username = '';
+              currentUser.name = '';
+              currentUser.role = '';
+              currentUser.employeeId = null;
+              currentUser.memberCreate = false;
+              currentUser.memberRead = false;
+              currentUser.memberUpdate = false;
+              currentUser.memberDelete = false;
+              // 显示提示并打开登录对话框
               ElementPlus.ElMessage.warning('登录已过期，请重新登录');
               openLogin();
             } else if (status === 403) {
@@ -1725,11 +2055,34 @@
           }
         );
 
-        onMounted(() => {
-          if (!getToken()) {
+        onMounted(async () => {
+          // 页面加载时，从localStorage恢复token到响应式状态
+          const storedToken = localStorage.getItem('token') || '';
+          if (storedToken) {
+            tokenState.value = storedToken;
+            console.log('[onMounted] 从localStorage恢复token:', storedToken.substring(0, 20) + '...');
+          }
+          
+          if (!tokenState.value) {
             openLogin();
           } else {
-            loadCardTypes();
+            // 验证token并恢复用户信息
+            const isValid = await validateToken();
+            if (isValid) {
+              // Token有效，确保tokenState已更新（validateToken可能已经更新了）
+              if (!tokenState.value) {
+                tokenState.value = getToken();
+              }
+              // 加载数据
+              await Promise.all([
+                loadCardTypes().catch(e => console.error('[onMounted] 加载卡种失败:', e)),
+                loadEmployees().catch(e => console.error('[onMounted] 加载员工失败:', e))
+              ]);
+            } else {
+              // Token无效，清除状态并显示登录对话框
+              clearTokenInComponent();
+              openLogin();
+            }
           }
         });
 
@@ -1740,12 +2093,16 @@
           currentUser,
           cardTypes,
           employees,
+          tokenState, // 暴露tokenState，确保响应式追踪
+          setTokenInComponent, clearTokenInComponent,
           loadCardTypes,
           loadEmployees,
+          validateToken,
           openLogin, doLogin, doLogout
         };
       },
       render() {
+        // 使用computed属性tokenPresent，确保Vue能正确追踪响应式变化
         // 如果没有token，只显示登录对话框，隐藏主界面
         if (!this.tokenPresent) {
           return h('div', { style: 'height: 100vh; display: flex; align-items: center; justify-content: center; background: #f5f7fa;' }, [

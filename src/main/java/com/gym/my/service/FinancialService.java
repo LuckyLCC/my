@@ -17,7 +17,6 @@ import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -153,14 +152,21 @@ public class FinancialService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         for (TransactionRecord record : records) {
             Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(record.getTransactionDate().format(formatter));
+            // 交易日期
+            row.createCell(0).setCellValue(record.getTransactionDate() != null ? record.getTransactionDate().format(formatter) : "");
+            // 会员信息
             row.createCell(1).setCellValue(record.getMember() != null && record.getMember().getName() != null ? record.getMember().getName() : "");
             row.createCell(2).setCellValue(record.getMember() != null && record.getMember().getPhone() != null ? record.getMember().getPhone() : "");
+            // 卡种
             row.createCell(3).setCellValue(record.getCardType() != null && record.getCardType().getName() != null ? record.getCardType().getName() : "");
+            // 交易类型
             row.createCell(4).setCellValue("NEW".equals(record.getTransactionType()) ? "新开卡" : "续费");
-            row.createCell(5).setCellValue(record.getAmount().doubleValue());
-            row.createCell(6).setCellValue(record.getCommissionAmount().doubleValue());
-            row.createCell(7).setCellValue(record.getEmployee() != null ? record.getEmployee().getName() : "");
+            // 交易金额和提成金额（可能为null）
+            row.createCell(5).setCellValue(record.getAmount() != null ? record.getAmount().doubleValue() : 0.0);
+            row.createCell(6).setCellValue(record.getCommissionAmount() != null ? record.getCommissionAmount().doubleValue() : 0.0);
+            // 员工信息
+            row.createCell(7).setCellValue(record.getEmployee() != null && record.getEmployee().getName() != null ? record.getEmployee().getName() : "");
+            // 备注
             row.createCell(8).setCellValue(record.getRemark() != null ? record.getRemark() : "");
         }
         
