@@ -67,7 +67,7 @@
 <!--        <dependency>-->
 <!--            <groupId>org.mybatis.spring.boot</groupId>-->
 <!--            <artifactId>mybatis-spring-boot-starter</artifactId>-->
-<!--            <version>2.3.1</version> &lt;!&ndash; 换成这个版本试试 &ndash;&gt;-->
+<!--            <version>2.3.1</version> <!- - 换成这个版本试试 - ->-->
 <!--        </dependency>-->
         <!-- Apache POI for Excel -->
         <dependency>
@@ -111,6 +111,20 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Mockito for testing -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- JSON Path for testing -->
+        <dependency>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

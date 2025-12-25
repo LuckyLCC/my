@@ -1,0 +1,461 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Login with Valid Credentials",
+    "description": "Verify that a user can log in successfully with valid username and password, and a JWT token is issued with 30 minutes validity.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Enter valid username and password."
+      },
+      {
+        "type": "action",
+        "description": "Submit login form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that login is successful and a JWT token is returned with 30 minutes expiry."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "User Login with Invalid Credentials",
+    "description": "Verify that login fails when using invalid username or password.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Enter invalid username or password."
+      },
+      {
+        "type": "action",
+        "description": "Submit login form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that login is denied with appropriate error message."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "JWT Token Auto-Refresh on Requests",
+    "description": "Verify that the JWT token's expiry is automatically extended upon each valid authenticated request within the system.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in and obtain JWT token."
+      },
+      {
+        "type": "action",
+        "description": "Make a valid authenticated API request before token expiry."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that token expiry is extended by 30 minutes."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Administrator Employee Account CRUD Operations",
+    "description": "Verify that only administrators can create, read, update, and delete employee accounts, and configure permissions correctly.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as administrator."
+      },
+      {
+        "type": "action",
+        "description": "Create a new employee account with specific permissions."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify employee is created with correct permissions."
+      },
+      {
+        "type": "action",
+        "description": "Retrieve employee account details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify retrieved details match the input."
+      },
+      {
+        "type": "action",
+        "description": "Update permissions for the employee."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify permissions are updated accurately."
+      },
+      {
+        "type": "action",
+        "description": "Delete the employee account."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify employee account is deleted successfully."
+      },
+      {
+        "type": "action",
+        "description": "Attempt employee CRUD operations while logged in as a non-administrator."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify operations are forbidden with appropriate error response."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Member Information CRUD and Multi-Condition Filtering",
+    "description": "Verify that permitted users can create, read, update, delete member information, and perform multi-condition filtering on member data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as user with member management permission."
+      },
+      {
+        "type": "action",
+        "description": "Create a new member with valid data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify member is created with correct details."
+      },
+      {
+        "type": "action",
+        "description": "Perform multi-condition filtering (e.g., by name, membership status, and card type)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify filtered member list matches criteria."
+      },
+      {
+        "type": "action",
+        "description": "Update member information."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify member details are updated correctly."
+      },
+      {
+        "type": "action",
+        "description": "Renew member's card via renewal functionality."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify renewed card validity and expiry date are correctly updated."
+      },
+      {
+        "type": "action",
+        "description": "Delete a member."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify member is removed from system."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Card Type Management with Validation and Status Control",
+    "description": "Verify that card types can be created, updated, retrieved, and deleted with validation (unique name, price > 0), and that card types currently in use cannot be deleted.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as administrator."
+      },
+      {
+        "type": "action",
+        "description": "Create new card type with unique name and price greater than zero."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify creation is successful."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to create a card type with an existing name."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify failure with unique name validation error."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to create or update a card type with zero or negative price."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify failure with price validation error."
+      },
+      {
+        "type": "action",
+        "description": "Retrieve list of card types and individual card type details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify data is correct."
+      },
+      {
+        "type": "action",
+        "description": "Update card type information."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify updated information is saved."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to delete card type currently assigned to members."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify deletion is prevented with appropriate error."
+      },
+      {
+        "type": "action",
+        "description": "Delete card type not assigned to any member."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify deletion is successful."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Commission Rule CRUD and Validation",
+    "description": "Verify that commission rules for employees can be created, read, updated, and deleted by administrators with validation for uniqueness, correct percentage or fixed amount, and association to card types and transaction types.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as administrator."
+      },
+      {
+        "type": "action",
+        "description": "Create a new commission rule linked to a card type and transaction type with valid percentage or fixed amount."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify creation is successful and data is accurate."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to create duplicate commission rule with same card and transaction type."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify failure with uniqueness validation error."
+      },
+      {
+        "type": "action",
+        "description": "Update existing commission rule with altered commission values."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify update is saved correctly."
+      },
+      {
+        "type": "action",
+        "description": "Delete a commission rule."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify deletion succeeds."
+      },
+      {
+        "type": "action",
+        "description": "Attempt CRUD operations as non-administrator."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify operations are forbidden."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Member Checkin Functionality and Validations",
+    "description": "Verify that member checkins succeed only when member card is valid and remaining sessions exist (for times-based cards), and prevent duplicate checkins and invalid entries.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as an employee with permission to perform member checkin."
+      },
+      {
+        "type": "action",
+        "description": "Perform checkin for member with valid active card and remaining sessions."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that checkin is recorded, remaining sessions count is decremented (if applicable), and success response returned."
+      },
+      {
+        "type": "action",
+        "description": "Attempt checkin for member with expired card."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify checkin is denied with card expired error."
+      },
+      {
+        "type": "action",
+        "description": "Attempt checkin for member with zero remaining sessions on a times-based card."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify checkin is denied with no sessions remaining error."
+      },
+      {
+        "type": "action",
+        "description": "Attempt multiple checkins by same member on the same day."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify duplicate checkins are prevented."
+      },
+      {
+        "type": "action",
+        "description": "Query member checkin history records with filters."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the historical checkin data is accurately returned."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Financial Statistics Query and Excel Export",
+    "description": "Verify that financial personnel can query monthly commission statistics and transaction details using multiple filter criteria and export the results accurately in Excel format.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as financial staff."
+      },
+      {
+        "type": "action",
+        "description": "Query financial statistics applying filters like month, card type, and employee."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that retrieved statistics and transaction details are correct and consistent with the data."
+      },
+      {
+        "type": "action",
+        "description": "Trigger export of queried results to Excel."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the exported Excel file structure, data accuracy, and formatting."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to export an empty or invalid query result."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify appropriate handling or message indicating no data to export."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Scheduled Task for Member Expiry and Session Cleanup",
+    "description": "Verify that the scheduled job properly updates member expiry statuses based on current date and cleans expired session records in the database.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Prepare members with expiry dates in the past, present, and future."
+      },
+      {
+        "type": "action",
+        "description": "Insert session records including expired and active sessions."
+      },
+      {
+        "type": "action",
+        "description": "Trigger the scheduled task manually (or wait for scheduled run)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify members with past expiry dates have status updated to expired."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all expired session records are deleted from the session store."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify active sessions and current members remain unaffected."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Role-Based Access Control Enforcement",
+    "description": "Verify the system restricts access to APIs and frontend features based on user roles and permissions, with JWT authentication verification.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as different roles: administrator, regular employee, and unauthorized user."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to access restricted APIs and UI components based on each role."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that access is granted only to authorized roles and blocked otherwise, with correct HTTP status codes."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to perform admin-only operations with non-admin JWT token."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify request is rejected with an appropriate error or forbidden status."
+      },
+      {
+        "type": "action",
+        "description": "Use expired or malformed JWT token for any request."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify authentication fails and access is denied."
+      }
+    ]
+  }
+]

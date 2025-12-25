@@ -1,0 +1,35 @@
+{
+  "name": "gym-management-frontend",
+  "version": "1.0.0",
+  "description": "健身房会员管理前端",
+  "main": "index.html",
+  "scripts": {
+    "test": "node frontend/test_automation.js",
+    "test:frontend": "node frontend/test_automation.js",
+    "start": "cd frontend && python3 -m http.server 5173",
+    "dev": "cd frontend && python3 -m http.server 5173"
+  },
+  "keywords": [
+    "gym",
+    "management",
+    "frontend"
+  ],
+  "author": "Gym Management System",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "@babel/core": "^7.20.0",
+    "@babel/preset-env": "^7.20.0",
+    "babel-jest": "^29.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [],
+    "testMatch": [
+      "**/test/**/*.test.js",
+      "**/test/**/*.spec.js",
+      "**/__tests__/**/*.js",
+      "**/frontend/**/*test*.js"
+    ]
+  }
+}

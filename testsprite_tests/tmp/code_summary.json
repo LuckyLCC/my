@@ -1,0 +1,116 @@
+{
+  "tech_stack": [
+    "Java 17",
+    "Spring Boot 3.2.0",
+    "MyBatis 3.0.3",
+    "MySQL 8.0+",
+    "JWT (JJWT 0.12.5)",
+    "Apache POI 5.2.5",
+    "Vue 3",
+    "Element Plus",
+    "Axios",
+    "Day.js"
+  ],
+  "features": [
+    {
+      "name": "认证授权模块",
+      "description": "用户登录、登出、获取当前用户信息，基于JWT的认证机制",
+      "files": [
+        "src/main/java/com/gym/my/controller/AuthController.java",
+        "src/main/java/com/gym/my/service/AuthService.java",
+        "src/main/java/com/gym/my/config/AuthInterceptor.java",
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "会员管理模块",
+      "description": "会员信息的增删改查、续费、签到历史查询等功能",
+      "files": [
+        "src/main/java/com/gym/my/controller/MemberController.java",
+        "src/main/java/com/gym/my/service/MemberService.java",
+        "src/main/java/com/gym/my/mapper/MemberMapper.java",
+        "src/main/java/com/gym/my/entity/Member.java",
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "卡种管理模块",
+      "description": "卡种类型的增删改查，支持月卡、季卡、年卡、次卡等多种类型",
+      "files": [
+        "src/main/java/com/gym/my/controller/CardTypeController.java",
+        "src/main/java/com/gym/my/service/CardTypeService.java",
+        "src/main/java/com/gym/my/mapper/CardTypeMapper.java",
+        "src/main/java/com/gym/my/entity/CardType.java",
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "员工管理模块",
+      "description": "员工账号的增删改查，权限管理（会员创建、读取、更新、删除权限）",
+      "files": [
+        "src/main/java/com/gym/my/controller/EmployeeController.java",
+        "src/main/java/com/gym/my/service/EmployeeService.java",
+        "src/main/java/com/gym/my/mapper/EmployeeMapper.java",
+        "src/main/java/com/gym/my/entity/Employee.java",
+        "src/main/java/com/gym/my/config/AdminInterceptor.java",
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "提成规则管理模块",
+      "description": "员工提成规则的增删改查，支持按卡种类型设置提成比例",
+      "files": [
+        "src/main/java/com/gym/my/controller/CommissionRuleController.java",
+        "src/main/java/com/gym/my/service/CommissionService.java",
+        "src/main/java/com/gym/my/mapper/CommissionRuleMapper.java",
+        "src/main/java/com/gym/my/entity/CommissionRule.java",
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "财务统计模块",
+      "description": "财务数据统计、报表导出（Excel）、提成统计、月度卡种汇总等功能",
+      "files": [
+        "src/main/java/com/gym/my/controller/FinancialController.java",
+        "src/main/java/com/gym/my/service/FinancialService.java",
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "会员签到模块",
+      "description": "会员签到功能，签到历史查询，次卡剩余次数管理",
+      "files": [
+        "src/main/java/com/gym/my/controller/MemberCheckinController.java",
+        "src/main/java/com/gym/my/service/MemberCheckinService.java",
+        "src/main/java/com/gym/my/mapper/MemberCheckinMapper.java",
+        "src/main/java/com/gym/my/entity/MemberCheckin.java",
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "前端UI组件",
+      "description": "基于Vue 3和Element Plus的单页面应用，包含登录界面、CRUD通用组件、数据表格、表单等",
+      "files": [
+        "frontend/index.html"
+      ]
+    },
+    {
+      "name": "权限拦截器",
+      "description": "基于角色的权限控制，JWT token验证，管理员权限拦截",
+      "files": [
+        "src/main/java/com/gym/my/config/AuthInterceptor.java",
+        "src/main/java/com/gym/my/config/AdminInterceptor.java",
+        "src/main/java/com/gym/my/config/WebConfig.java",
+        "src/main/java/com/gym/my/util/PermissionUtil.java"
+      ]
+    },
+    {
+      "name": "定时任务",
+      "description": "定时任务处理，如会员到期提醒等",
+      "files": [
+        "src/main/java/com/gym/my/task/ScheduledTasks.java"
+      ]
+    }
+  ]
+}
+
