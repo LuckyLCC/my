@@ -71,24 +71,24 @@
   </style>
 </head>
 <body>
-  <div id="app"></div>
+<div id="app"></div>
 
-  <!-- Vue 3 -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <!-- Element Plus -->
-  <script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
-  <!-- Axios -->
-  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-  <!-- Day.js for date formatting -->
-  <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
-  <!-- Element Plus Icons -->
-  <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+<!-- Vue 3 -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<!-- Element Plus -->
+<script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
+<!-- Axios -->
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<!-- Day.js for date formatting -->
+<script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+<!-- Element Plus Icons -->
+<script src="https://unpkg.com/@element-plus/icons-vue"></script>
 
-  <script>
-    (function boot() {
-      function showBootError(title, details) {
-        const root = document.getElementById('app') || document.body;
-        root.innerHTML = `
+<script>
+  (function boot() {
+    function showBootError(title, details) {
+      const root = document.getElementById('app') || document.body;
+      root.innerHTML = `
           <div style="max-width:980px;margin:40px auto;padding:18px 18px;border:1px solid #fca5a5;background:#fff;border-radius:12px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">
             <div style="font-size:18px;font-weight:800;color:#991b1b;">${title}</div>
             <div style="margin-top:10px;color:#334155;line-height:1.6;">
@@ -104,1570 +104,1683 @@
             </div>
           </div>
         `;
+    }
+
+    try {
+      if (!window.Vue) throw new Error('Vue 未加载（window.Vue 不存在）');
+      if (!window.ElementPlus) throw new Error('Element Plus 未加载（window.ElementPlus 不存在）');
+      if (!window.axios) throw new Error('Axios 未加载（window.axios 不存在）');
+
+      const { createApp, ref, reactive, computed, watch, onMounted, defineComponent, h } = window.Vue;
+
+      // ----------------------------
+      // Axios global config
+      // ----------------------------
+      const http = axios.create({
+        baseURL: 'http://localhost:8080',
+        withCredentials: true
+      });
+
+      function getToken() {
+        return localStorage.getItem('token') || '';
+      }
+      function setToken(token) {
+        localStorage.setItem('token', token || '');
+      }
+      function clearToken() {
+        localStorage.removeItem('token');
       }
 
-      try {
-        if (!window.Vue) throw new Error('Vue 未加载（window.Vue 不存在）');
-        if (!window.ElementPlus) throw new Error('Element Plus 未加载（window.ElementPlus 不存在）');
-        if (!window.axios) throw new Error('Axios 未加载（window.axios 不存在）');
+      http.interceptors.request.use((config) => {
+        const token = getToken();
+        if (token) {
+          config.headers = config.headers || {};
+          config.headers['Authorization'] = 'Bearer ' + token;
+        }
+        return config;
+      });
 
-        const { createApp, ref, reactive, computed, watch, onMounted, nextTick, defineComponent, h } = window.Vue;
-
-    // ----------------------------
-    // Axios global config
-    // ----------------------------
-    const http = axios.create({
-      baseURL: 'http://localhost:8080',
-      withCredentials: true
-    });
-
-    // 使用响应式变量跟踪token状态
-    const tokenState = ref(localStorage.getItem('token') || '');
-    
-    function getToken() {
-      return tokenState.value || localStorage.getItem('token') || '';
-    }
-    function setToken(token) {
-      const tokenValue = token || '';
-      localStorage.setItem('token', tokenValue);
-      tokenState.value = tokenValue; // 更新响应式状态
-    }
-    function clearToken() {
-      localStorage.removeItem('token');
-      tokenState.value = ''; // 更新响应式状态
-    }
-
-    http.interceptors.request.use((config) => {
-      // 确保每次都从最新的tokenState或localStorage读取token
-      const token = tokenState.value || localStorage.getItem('token') || '';
-      if (token) {
-        config.headers = config.headers || {};
-        config.headers['Authorization'] = 'Bearer ' + token;
-        console.log('[Request Interceptor] 添加Authorization header，token:', token.substring(0, 20) + '...');
-      } else {
-        console.warn('[Request Interceptor] 没有token，请求可能失败');
+      // ----------------------------
+      // Helpers
+      // ----------------------------
+      function isDateKey(key) {
+        // only treat typical date/time keys as date-like; avoid matching words like "Times"/"remainingTimes"
+        return /(date$|Date$|At$|Time$|time$|expiresAt$|expires_at$)/.test(String(key));
       }
-      return config;
-    });
-
-    // ----------------------------
-    // Helpers
-    // ----------------------------
-    function isDateKey(key) {
-      // only treat typical date/time keys as date-like; avoid matching words like "Times"/"remainingTimes"
-      return /(date$|Date$|At$|Time$|time$|expiresAt$|expires_at$)/.test(String(key));
-    }
-    function formatValue(key, val) {
-      if (val === null || val === undefined) return '';
-      if (typeof val === 'object') return JSON.stringify(val);
-      if (key === 'status' || /status$/i.test(key)) {
-        if (val === 1 || val === '1') return '启用';
-        if (val === 0 || val === '0') return '禁用';
+      function formatValue(key, val) {
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'object') return JSON.stringify(val);
+        if (key === 'status' || /status$/i.test(key)) {
+          if (val === 1 || val === '1') return '启用';
+          if (val === 0 || val === '0') return '禁用';
+          return String(val);
+        }
+        if (isDateKey(key)) {
+          // backend might return "yyyy-MM-dd" or "yyyy-MM-dd HH:mm:ss"
+          const s = String(val);
+          if (!s) return '';
+          const d = dayjs(s);
+          if (d.isValid()) {
+            return s.length > 10 ? d.format('YYYY-MM-DD HH:mm:ss') : d.format('YYYY-MM-DD');
+          }
+          return s;
+        }
         return String(val);
       }
-      if (isDateKey(key)) {
-        // backend might return "yyyy-MM-dd" or "yyyy-MM-dd HH:mm:ss"
-        const s = String(val);
-        if (!s) return '';
-        const d = dayjs(s);
-        if (d.isValid()) {
-          return s.length > 10 ? d.format('YYYY-MM-DD HH:mm:ss') : d.format('YYYY-MM-DD');
-        }
-        return s;
+
+      function pick(obj, keys) {
+        const out = {};
+        keys.forEach(k => { if (obj[k] !== undefined) out[k] = obj[k]; });
+        return out;
       }
-      return String(val);
-    }
 
-    function pick(obj, keys) {
-      const out = {};
-      keys.forEach(k => { if (obj[k] !== undefined) out[k] = obj[k]; });
-      return out;
-    }
+      // ----------------------------
+      // Generic CRUD View
+      // ----------------------------
+      const CrudView = defineComponent({
+        name: 'CrudView',
+        props: {
+          module: { type: Object, required: true },
+          authVersion: { type: Number, required: true },
+          isAuthed: { type: Boolean, required: true },
+          currentEmployeeId: { type: [Number, String, null], required: false, default: null },
+          cardTypes: { type: Array, required: false, default: () => [] },
+          employees: { type: Array, required: false, default: () => [] },
+          onRefreshCardTypes: { type: Function, required: false, default: null },
+          onRefreshEmployees: { type: Function, required: false, default: null }
+        },
+        setup(props) {
+          const loading = ref(false);
+          const rows = ref([]);
+          const errorText = ref('');
 
-    // ----------------------------
-    // Generic CRUD View
-    // ----------------------------
-    const CrudView = defineComponent({
-      name: 'CrudView',
-      props: {
-        module: { type: Object, required: true },
-        authVersion: { type: Number, required: true },
-        isAuthed: { type: Boolean, required: true },
-        currentEmployeeId: { type: [Number, String, null], required: false, default: null },
-        currentUser: { type: Object, required: false, default: () => null },
-        cardTypes: { type: Array, required: false, default: () => [] },
-        employees: { type: Array, required: false, default: () => [] },
-        onRefreshCardTypes: { type: Function, required: false, default: null },
-        onRefreshEmployees: { type: Function, required: false, default: null }
-      },
-      setup(props) {
-        const loading = ref(false);
-        const rows = ref([]);
-        const errorText = ref('');
+          const createDialogVisible = ref(false);
+          const createForm = reactive({});
+          const createFormRef = ref();
 
-        const createDialogVisible = ref(false);
-        const createForm = reactive({});
-        const createFormRef = ref();
+          const editDialogVisible = ref(false);
+          const editForm = reactive({});
+          const editingRow = ref(null);
 
-        const editDialogVisible = ref(false);
-        const editForm = reactive({});
-        const editingRow = ref(null);
+          const checkinHistoryVisible = ref(false);
+          const checkinHistory = ref([]);
+          const currentCheckinMember = ref(null);
+          const checkinLoading = ref(false);
 
-        const checkinHistoryVisible = ref(false);
-        const checkinHistory = ref([]);
-        const currentCheckinMember = ref(null);
-        const checkinLoading = ref(false);
+          const cardDetailVisible = ref(false);
+          const cardDetailList = ref([]);
+          const currentCardDetailEmployee = ref(null);
 
-        const cardDetailVisible = ref(false);
-        const cardDetailList = ref([]);
-        const currentCardDetailEmployee = ref(null);
+          const renewDialogVisible = ref(false);
+          const renewForm = reactive({
+            memberId: null,
+            cardTypeId: null,
+            renewDate: dayjs().format('YYYY-MM-DD'),
+            employeeId: null,
+            remark: ''
+          });
+          const renewLoading = ref(false);
+          const currentRenewMember = ref(null);
 
-        const renewDialogVisible = ref(false);
-        const renewForm = reactive({
-          memberId: null,
-          cardTypeId: null,
-          renewDate: dayjs().format('YYYY-MM-DD'),
-          employeeId: null,
-          remark: ''
-        });
-        const renewLoading = ref(false);
-        const currentRenewMember = ref(null);
+          const renewHistoryVisible = ref(false);
+          const renewHistory = ref([]);
+          const renewHistoryLoading = ref(false);
 
-        const renewHistoryVisible = ref(false);
-        const renewHistory = ref([]);
-        const renewHistoryLoading = ref(false);
+          const summaryInfo = ref(null); // 用于存储开卡统计汇总信息
 
-        const summaryInfo = ref(null); // 用于存储开卡统计汇总信息
+          const listParams = reactive({});
 
-        const listParams = reactive({});
+          const canCreate = computed(() => !!props.module.create);
+          const canDelete = computed(() => !!props.module.delete);
+          const canUpdate = computed(() => !!props.module.update);
+          const isReadOnly = computed(() => !canCreate.value && !canDelete.value);
 
-        // 对于会员模块，需要检查当前用户的权限
-        // 辅助函数：检查权限值（兼容 true/1 和 false/0）
-        const hasPermission = (perm) => {
-          return perm === true || perm === 1 || perm === '1';
-        };
-        
-        const canCreate = computed(() => {
-          if (props.module.key === 'members' && props.currentUser) {
-            return hasPermission(props.currentUser.memberCreate) || props.currentUser.role === 'ADMIN';
-          }
-          return !!props.module.create;
-        });
-        const canDelete = computed(() => {
-          if (props.module.key === 'members' && props.currentUser) {
-            return hasPermission(props.currentUser.memberDelete) || props.currentUser.role === 'ADMIN';
-          }
-          return !!props.module.delete;
-        });
-        const canUpdate = computed(() => {
-          if (props.module.key === 'members' && props.currentUser) {
-            return hasPermission(props.currentUser.memberUpdate) || props.currentUser.role === 'ADMIN';
-          }
-          return !!props.module.update;
-        });
-        const canRead = computed(() => {
-          if (props.module.key === 'members' && props.currentUser) {
-            return hasPermission(props.currentUser.memberRead) || props.currentUser.role === 'ADMIN';
-          }
-          return true; // 默认可以查看
-        });
-        const isReadOnly = computed(() => !canCreate.value && !canDelete.value);
+          function initForms() {
+            // init create form
+            Object.keys(createForm).forEach(k => delete createForm[k]);
+            (props.module.formFields || []).forEach(f => {
+              const def = f.default;
+              if (typeof def === 'function') {
+                createForm[f.key] = def({ currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes, employees: props.employees });
+              } else {
+                createForm[f.key] = def !== undefined ? def : '';
+              }
+            });
 
-        function initForms() {
-          // init create form
-          Object.keys(createForm).forEach(k => delete createForm[k]);
-          (props.module.formFields || []).forEach(f => {
-            const def = f.default;
-            if (typeof def === 'function') {
-              createForm[f.key] = def({ currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes, employees: props.employees });
-            } else {
-              createForm[f.key] = def !== undefined ? def : '';
+            // 如果默认选择的卡种是次卡，自动填充剩余次数
+            if (createForm.cardTypeId) {
+              const selectedCardType = props.cardTypes?.find(ct => ct.id === createForm.cardTypeId);
+              if (selectedCardType?.type === 'TIMES') {
+                createForm.remainingTimes = selectedCardType.duration || 0;
+              } else {
+                createForm.remainingTimes = null;
+              }
             }
-          });
-          
-          // 如果默认选择的卡种是次卡，自动填充剩余次数
-          if (createForm.cardTypeId) {
-            const selectedCardType = props.cardTypes?.find(ct => ct.id === createForm.cardTypeId);
-            if (selectedCardType?.type === 'TIMES') {
-              createForm.remainingTimes = selectedCardType.duration || 0;
-            } else {
-              createForm.remainingTimes = null;
-            }
+
+            // init edit form keys
+            Object.keys(editForm).forEach(k => delete editForm[k]);
+            (props.module.formFields || []).forEach(f => {
+              editForm[f.key] = '';
+            });
+
+            // init list params
+            Object.keys(listParams).forEach(k => delete listParams[k]);
+            (props.module.listParams || []).forEach(p => {
+              listParams[p.key] = p.default !== undefined ? p.default : '';
+            });
           }
 
-          // init edit form keys
-          Object.keys(editForm).forEach(k => delete editForm[k]);
-          (props.module.formFields || []).forEach(f => {
-            editForm[f.key] = '';
-          });
-
-          // init list params
-          Object.keys(listParams).forEach(k => delete listParams[k]);
-          (props.module.listParams || []).forEach(p => {
-            listParams[p.key] = p.default !== undefined ? p.default : '';
-          });
-        }
-
-        async function loadList() {
-          if (!props.isAuthed) {
-            rows.value = [];
-            errorText.value = '未登录：请先登录后再加载数据';
-            return;
-          }
-          
-          // 检查token是否存在
-          const token = getToken();
-          if (!token) {
-            console.warn(`[loadList] 没有token，跳过加载: module="${props.module?.key}"`);
-            rows.value = [];
-            errorText.value = '未登录：请先登录后再加载数据';
-            return;
-          }
-          
-          // 对于会员模块，检查查看权限
-          const moduleKey = props.module?.key || '';
-          if (moduleKey === 'members' && props.currentUser) {
-            if (!props.currentUser.memberRead && props.currentUser.role !== 'ADMIN') {
+          async function loadList() {
+            if (!props.isAuthed) {
               rows.value = [];
-              errorText.value = '权限不足：无会员查看权限';
+              errorText.value = '未登录：请先登录后再加载数据';
+              return;
+            }
+            errorText.value = '';
+            loading.value = true;
+            try {
+              const moduleKey = props.module?.key || 'unknown';
+              const url = props.module?.list?.url || '';
+              console.log(`[loadList] 加载数据: module="${moduleKey}", url="${url}"`);
+              let res;
+              if (props.module.list && props.module.list.method === 'GET') {
+                res = await http.get(props.module.list.url, { params: props.module.list.params ? props.module.list.params(listParams) : listParams });
+              } else {
+                res = await http.request({ method: props.module.list.method || 'GET', url: props.module.list.url, params: listParams });
+              }
+              const body = res.data || {};
+              if (body.code !== 200) throw new Error(body.message || '加载失败');
+
+              // 特殊处理：开卡统计模块返回的是MonthlyCardSummary对象
+              if (moduleKey === 'cardSummary' && body.data && body.data.employeeStats) {
+                // 保存汇总信息
+                summaryInfo.value = {
+                  month: body.data.month,
+                  totalCardAmount: body.data.totalCardAmount,
+                  totalCardCount: body.data.totalCardCount
+                };
+                // 显示员工统计列表
+                const data = Array.isArray(body.data.employeeStats) ? body.data.employeeStats : [];
+                console.log(`[loadList] 加载完成: module="${moduleKey}", 汇总金额=${body.data.totalCardAmount}, 汇总数量=${body.data.totalCardCount}, 员工数=${data.length}`);
+                rows.value = data;
+              } else {
+                const data = Array.isArray(body.data) ? body.data : (body.data ? [body.data] : []);
+                console.log(`[loadList] 加载完成: module="${moduleKey}", 数据条数=${data.length}`);
+                rows.value = data;
+              }
+
+              // 如果是会员管理模块，确保员工列表已加载（用于显示员工姓名）
+              if (moduleKey === 'members' && props.onRefreshEmployees) {
+                await props.onRefreshEmployees();
+              }
+            } catch (e) {
+              const serverMsg = e?.response?.data?.message;
+              errorText.value = serverMsg || e?.message || String(e);
+              console.error(`[loadList] 加载失败: module="${props.module?.key}", error=`, e);
+            } finally {
               loading.value = false;
-              return;
             }
           }
-          
-          errorText.value = '';
-          loading.value = true;
-          try {
-            const moduleKey = props.module?.key || 'unknown';
-            const url = props.module?.list?.url || '';
-            console.log(`[loadList] 加载数据: module="${moduleKey}", url="${url}", token存在: ${!!token}`);
-            let res;
-            if (props.module.list && props.module.list.method === 'GET') {
-              res = await http.get(props.module.list.url, { params: props.module.list.params ? props.module.list.params(listParams) : listParams });
-            } else {
-              res = await http.request({ method: props.module.list.method || 'GET', url: props.module.list.url, params: listParams });
-            }
-            const body = res.data || {};
-            if (body.code !== 200) throw new Error(body.message || '加载失败');
-            
-            // 特殊处理：开卡统计模块返回的是MonthlyCardSummary对象
-            if (moduleKey === 'cardSummary' && body.data && body.data.employeeStats) {
-              // 保存汇总信息
-              summaryInfo.value = {
-                month: body.data.month,
-                totalCardAmount: body.data.totalCardAmount,
-                totalCardCount: body.data.totalCardCount
-              };
-              // 显示员工统计列表
-              const data = Array.isArray(body.data.employeeStats) ? body.data.employeeStats : [];
-              console.log(`[loadList] 加载完成: module="${moduleKey}", 汇总金额=${body.data.totalCardAmount}, 汇总数量=${body.data.totalCardCount}, 员工数=${data.length}`);
-              rows.value = data;
-            } else {
-              const data = Array.isArray(body.data) ? body.data : (body.data ? [body.data] : []);
-              console.log(`[loadList] 加载完成: module="${moduleKey}", 数据条数=${data.length}`);
-              rows.value = data;
-            }
-            
-            // 如果是会员管理模块，确保员工列表已加载（用于显示员工姓名）
-            if (moduleKey === 'members' && props.onRefreshEmployees) {
-              await props.onRefreshEmployees();
-            }
-          } catch (e) {
-            const status = e?.response?.status;
-            const serverMsg = e?.response?.data?.message;
-            errorText.value = serverMsg || e?.message || String(e);
-            console.error(`[loadList] 加载失败: module="${props.module?.key}", error=`, e, 'status:', status);
-            
-            // 如果是401错误，清除token并触发重新登录
-            if (status === 401) {
-              console.warn(`[loadList] 认证失败，清除token: module="${props.module?.key}"`);
-              const currentToken = getToken();
-              if (currentToken) {
-                clearTokenInComponent();
-              }
-            }
-          } finally {
-            loading.value = false;
-          }
-        }
 
-        async function openCreate() {
-          // 如果模块需要卡种数据（比如会员管理的 cardTypeId 字段），打开弹窗前刷新卡种列表
-          const needsCardTypes = props.module.formFields && props.module.formFields.some(f => f.key === 'cardTypeId');
-          if (needsCardTypes && props.onRefreshCardTypes) {
-            await props.onRefreshCardTypes();
-          }
-          // 如果模块需要员工数据（比如会员管理的 employeeId 字段），打开弹窗前刷新员工列表
-          const needsEmployees = props.module.formFields && props.module.formFields.some(f => f.key === 'employeeId');
-          if (needsEmployees && props.onRefreshEmployees) {
-            await props.onRefreshEmployees();
-          }
-          initForms();
-          createDialogVisible.value = true;
-        }
-
-        async function submitCreate() {
-          errorText.value = '';
-          loading.value = true;
-          try {
-            let payload = props.module.create && props.module.create.payload
-              ? props.module.create.payload(createForm, { currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes })
-              : { ...createForm };
-            
-            const res = await http.post(props.module.create.url, payload);
-            const body = res.data || {};
-            if (body.code !== 200) throw new Error(body.message || '新增失败');
-            createDialogVisible.value = false;
-            await loadList();
-            ElementPlus.ElMessage.success(body.message || '新增成功');
-          } catch (e) {
-            const serverMsg = e?.response?.data?.message;
-            ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
-          } finally {
-            loading.value = false;
-          }
-        }
-
-        function openEdit(row) {
-          editingRow.value = row;
-          (props.module.formFields || []).forEach(f => {
-            let v = row ? row[f.key] : '';
-            if ((v === undefined || v === null || v === '') && f.key === 'cardTypeId' && row?.cardType?.id) {
-              v = row.cardType.id;
-            }
-            editForm[f.key] = v !== undefined ? v : '';
-          });
-          
-          // 如果编辑的会员是次卡，确保剩余次数字段有值
-          if (editForm.cardTypeId) {
-            const selectedCardType = props.cardTypes?.find(ct => ct.id === editForm.cardTypeId);
-            if (selectedCardType?.type === 'TIMES' && (editForm.remainingTimes === undefined || editForm.remainingTimes === null || editForm.remainingTimes === '')) {
-              editForm.remainingTimes = selectedCardType.duration || row?.remainingTimes || 0;
-            } else if (selectedCardType?.type !== 'TIMES') {
-              editForm.remainingTimes = null;
-            }
-          }
-          
-          editDialogVisible.value = true;
-        }
-
-        async function submitEdit() {
-          errorText.value = '';
-          loading.value = true;
-          try {
-            const row = editingRow.value || {};
-            let payload = props.module.update && props.module.update.payload
-              ? props.module.update.payload(editForm, row, { currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes })
-              : { ...editForm };
-            
-            const url = props.module.update.url(row);
-            const res = await http.put(url, payload);
-            const body = res.data || {};
-            if (body.code !== 200) throw new Error(body.message || '更新失败');
-            editDialogVisible.value = false;
-            await loadList();
-            ElementPlus.ElMessage.success(body.message || '更新成功');
-          } catch (e) {
-            const serverMsg = e?.response?.data?.message;
-            ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
-          } finally {
-            loading.value = false;
-          }
-        }
-
-        async function doDelete(row) {
-          errorText.value = '';
-          try {
-            await ElementPlus.ElMessageBox.confirm('确认删除该记录？此操作不可撤销。', '删除确认', {
-              confirmButtonText: '删除',
-              cancelButtonText: '取消',
-              type: 'warning'
-            });
-          } catch {
-            return;
-          }
-          loading.value = true;
-          try {
-            const url = props.module.delete.url(row);
-            const res = await http.delete(url);
-            const body = res.data || {};
-            if (body.code !== 200) throw new Error(body.message || '删除失败');
-            ElementPlus.ElMessage.success(body.message || '删除成功');
-            await loadList();
-          } catch (e) {
-            const serverMsg = e?.response?.data?.message;
-            ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
-          } finally {
-            loading.value = false;
-          }
-        }
-
-        async function doCheckin(row) {
-          checkinLoading.value = true;
-          try {
-            const res = await http.post(`/api/members/${row.id}/checkin`);
-            const body = res.data || {};
-            if (body.code !== 200) throw new Error(body.message || '签到失败');
-            ElementPlus.ElMessage.success(body.message || '签到成功');
-            await loadList(); // 刷新列表
-          } catch (e) {
-            const serverMsg = e?.response?.data?.message;
-            ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
-          } finally {
-            checkinLoading.value = false;
-          }
-        }
-
-        async function openCheckinHistory(row) {
-          currentCheckinMember.value = row;
-          checkinLoading.value = true;
-          try {
-            const res = await http.get(`/api/members/${row.id}/checkins`);
-            const body = res.data || {};
-            if (body.code === 200 && Array.isArray(body.data)) {
-              checkinHistory.value = body.data;
-            } else {
-              checkinHistory.value = [];
-            }
-            checkinHistoryVisible.value = true;
-          } catch (e) {
-            ElementPlus.ElMessage.error('加载签到历史失败：' + (e?.message || String(e)));
-            checkinHistory.value = [];
-          } finally {
-            checkinLoading.value = false;
-          }
-        }
-
-        function openCardDetail(row) {
-          currentCardDetailEmployee.value = row;
-          if (row?.cardMembers && Array.isArray(row.cardMembers)) {
-            cardDetailList.value = row.cardMembers;
-            // 调试：打印第一条数据，查看字段名
-            if (row.cardMembers.length > 0) {
-              console.log('[openCardDetail] 第一条数据:', row.cardMembers[0]);
-              console.log('[openCardDetail] createdAt字段:', row.cardMembers[0].createdAt);
-              console.log('[openCardDetail] created_at字段:', row.cardMembers[0].created_at);
-            }
-          } else {
-            cardDetailList.value = [];
-          }
-          cardDetailVisible.value = true;
-        }
-
-        async function openRenew(row) {
-          currentRenewMember.value = row;
-          renewForm.memberId = row.id;
-          renewForm.cardTypeId = row.cardTypeId || null;
-          renewForm.renewDate = dayjs().format('YYYY-MM-DD');
-          renewForm.employeeId = props.currentEmployeeId || null;
-          renewForm.remark = '';
-          // 打开对话框前重新加载卡种列表，确保显示最新的启用状态
-          if (props.onRefreshCardTypes && typeof props.onRefreshCardTypes === 'function') {
-            try {
+          async function openCreate() {
+            // 如果模块需要卡种数据（比如会员管理的 cardTypeId 字段），打开弹窗前刷新卡种列表
+            const needsCardTypes = props.module.formFields && props.module.formFields.some(f => f.key === 'cardTypeId');
+            if (needsCardTypes && props.onRefreshCardTypes) {
               await props.onRefreshCardTypes();
-              console.log('[openRenew] 已重新加载卡种列表');
-            } catch (e) {
-              console.warn('[openRenew] 重新加载卡种列表失败:', e);
             }
-          }
-          // 确保员工数据已加载
-          if (props.onRefreshEmployees && typeof props.onRefreshEmployees === 'function') {
-            try {
+            // 如果模块需要员工数据（比如会员管理的 employeeId 字段），打开弹窗前刷新员工列表
+            const needsEmployees = props.module.formFields && props.module.formFields.some(f => f.key === 'employeeId');
+            if (needsEmployees && props.onRefreshEmployees) {
               await props.onRefreshEmployees();
-              console.log('[openRenew] 已重新加载员工列表');
+            }
+            initForms();
+            createDialogVisible.value = true;
+          }
+
+          async function submitCreate() {
+            errorText.value = '';
+            loading.value = true;
+            try {
+              const payload = props.module.create && props.module.create.payload
+                      ? props.module.create.payload(createForm, { currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes })
+                      : { ...createForm };
+              const res = await http.post(props.module.create.url, payload);
+              const body = res.data || {};
+              if (body.code !== 200) throw new Error(body.message || '新增失败');
+              createDialogVisible.value = false;
+              await loadList();
+              ElementPlus.ElMessage.success(body.message || '新增成功');
             } catch (e) {
-              console.warn('[openRenew] 重新加载员工列表失败:', e);
+              const serverMsg = e?.response?.data?.message;
+              ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
+            } finally {
+              loading.value = false;
             }
           }
-          renewDialogVisible.value = true;
-        }
 
-        async function submitRenew() {
-          if (!renewForm.memberId || !renewForm.cardTypeId || !renewForm.renewDate) {
-            ElementPlus.ElMessage.warning('请填写完整信息');
-            return;
-          }
-          renewLoading.value = true;
-          try {
-            const res = await http.post('/api/members/renew', {
-              memberId: renewForm.memberId,
-              cardTypeId: renewForm.cardTypeId,
-              renewDate: renewForm.renewDate,
-              employeeId: renewForm.employeeId || props.currentEmployeeId,
-              remark: renewForm.remark || null
+          function openEdit(row) {
+            editingRow.value = row;
+            (props.module.formFields || []).forEach(f => {
+              let v = row ? row[f.key] : '';
+              if ((v === undefined || v === null || v === '') && f.key === 'cardTypeId' && row?.cardType?.id) {
+                v = row.cardType.id;
+              }
+              editForm[f.key] = v !== undefined ? v : '';
             });
-            const body = res.data || {};
-            if (body.code !== 200) throw new Error(body.message || '续卡失败');
-            ElementPlus.ElMessage.success(body.message || '续卡成功');
-            renewDialogVisible.value = false;
-            await loadList(); // 刷新列表
-          } catch (e) {
-            const serverMsg = e?.response?.data?.message;
-            ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
-          } finally {
-            renewLoading.value = false;
-          }
-        }
 
-        async function openRenewHistory(row) {
-          currentRenewMember.value = row;
-          renewHistoryLoading.value = true;
-          try {
-            const res = await http.get(`/api/members/${row.id}/renew-history`);
-            const body = res.data || {};
-            if (body.code === 200 && Array.isArray(body.data)) {
-              renewHistory.value = body.data;
-            } else {
-              renewHistory.value = [];
+            // 如果编辑的会员是次卡，确保剩余次数字段有值
+            if (editForm.cardTypeId) {
+              const selectedCardType = props.cardTypes?.find(ct => ct.id === editForm.cardTypeId);
+              if (selectedCardType?.type === 'TIMES' && (editForm.remainingTimes === undefined || editForm.remainingTimes === null || editForm.remainingTimes === '')) {
+                editForm.remainingTimes = selectedCardType.duration || row?.remainingTimes || 0;
+              } else if (selectedCardType?.type !== 'TIMES') {
+                editForm.remainingTimes = null;
+              }
             }
-            renewHistoryVisible.value = true;
-          } catch (e) {
-            ElementPlus.ElMessage.error('加载续卡历史失败：' + (e?.message || String(e)));
-            renewHistory.value = [];
-          } finally {
-            renewHistoryLoading.value = false;
+
+            editDialogVisible.value = true;
           }
-        }
 
-        function renderField(field, form) {
-          const modelKey = field.key;
-          const label = field.label || field.key;
-          const target = form || createForm;
-
-          // remainingTimes: 只在选择次卡时显示
-          if (modelKey === 'remainingTimes') {
-            const cardTypeId = target.cardTypeId;
-            const selectedCardType = props.cardTypes?.find(ct => ct.id === cardTypeId);
-            const isTimesCard = selectedCardType?.type === 'TIMES';
-            
-            // 如果不是次卡，不显示该字段
-            if (!isTimesCard) {
-              return null;
+          async function submitEdit() {
+            errorText.value = '';
+            loading.value = true;
+            try {
+              const row = editingRow.value || {};
+              const payload = props.module.update && props.module.update.payload
+                      ? props.module.update.payload(editForm, row, { currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes })
+                      : { ...editForm };
+              const url = props.module.update.url(row);
+              const res = await http.put(url, payload);
+              const body = res.data || {};
+              if (body.code !== 200) throw new Error(body.message || '更新失败');
+              editDialogVisible.value = false;
+              await loadList();
+              ElementPlus.ElMessage.success(body.message || '更新成功');
+            } catch (e) {
+              const serverMsg = e?.response?.data?.message;
+              ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
+            } finally {
+              loading.value = false;
             }
-            
-            // 如果是次卡，显示数字输入框
-            return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
-              h(ElementPlus.ElInputNumber, {
-                modelValue: target[modelKey],
-                'onUpdate:modelValue': (v) => target[modelKey] = v,
-                controlsPosition: 'right',
-                class: 'full-width',
-                min: 0
-              })
-            );
           }
 
-          // number-ish -> input-number (must win over "time" substring, e.g. remainingTimes)
-          if (field.type === 'number') {
-            return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
-              h(ElementPlus.ElInputNumber, {
-                modelValue: target[modelKey],
-                'onUpdate:modelValue': (v) => target[modelKey] = v,
-                controlsPosition: 'right',
-                class: 'full-width'
-              })
-            );
-          }
-
-          // status switch (1/0)
-          if (field.type === 'switch' || modelKey === 'status') {
-            return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
-              h(ElementPlus.ElSwitch, {
-                modelValue: target[modelKey] === 1 || target[modelKey] === '1' || target[modelKey] === true,
-                'onUpdate:modelValue': (v) => target[modelKey] = v ? 1 : 0,
-                activeText: '启用',
-                inactiveText: '禁用'
-              })
-            );
-          }
-
-          // select
-          if (field.type === 'select') {
-            const opts = typeof field.options === 'function'
-              ? field.options({ currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes, employees: props.employees })
-              : (field.options || []);
-            // 调试：如果是员工选择框，打印选项
-            if (modelKey === 'employeeId') {
-              console.log('[renderField] employeeId 字段 - employees prop:', props.employees);
-              console.log('[renderField] employeeId 字段 - options:', opts);
-            }
-            return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
-              h(ElementPlus.ElSelect, {
-                modelValue: target[modelKey],
-                'onUpdate:modelValue': (v) => {
-                  target[modelKey] = v;
-                  // 如果选择的是卡种，且是次卡，自动填充剩余次数
-                  if (modelKey === 'cardTypeId' && form === createForm) {
-                    const selectedCardType = props.cardTypes?.find(ct => ct.id === v);
-                    if (selectedCardType?.type === 'TIMES') {
-                      createForm.remainingTimes = selectedCardType.duration || 0;
-                    } else {
-                      // 如果不是次卡，清空剩余次数
-                      createForm.remainingTimes = null;
-                    }
-                  }
-                  // 编辑表单也做同样处理
-                  if (modelKey === 'cardTypeId' && form === editForm) {
-                    const selectedCardType = props.cardTypes?.find(ct => ct.id === v);
-                    if (selectedCardType?.type === 'TIMES') {
-                      editForm.remainingTimes = selectedCardType.duration || editForm.remainingTimes || 0;
-                    } else {
-                      editForm.remainingTimes = null;
-                    }
-                  }
-                },
-                filterable: true,
-                clearable: true,
-                placeholder: field.placeholder || '请选择',
-                class: 'full-width'
-              }, () => opts.map(o =>
-                h(ElementPlus.ElOption, { key: String(o.value), label: o.label, value: o.value })
-              ))
-            );
-          }
-
-          // Date-ish fields -> date picker
-          if (field.type === 'date' || (!field.type && isDateKey(field.key))) {
-            return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
-              h(ElementPlus.ElDatePicker, {
-                modelValue: target[modelKey],
-                'onUpdate:modelValue': (v) => target[modelKey] = v,
-                type: 'date',
-                valueFormat: 'YYYY-MM-DD',
-                format: 'YYYY-MM-DD',
-                placeholder: '请选择日期',
-                class: 'full-width'
-              })
-            );
-          }
-
-          // default -> input
-          return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
-            h(ElementPlus.ElInput, {
-              modelValue: target[modelKey],
-              'onUpdate:modelValue': (v) => target[modelKey] = v,
-              placeholder: '请输入',
-              clearable: true
-            })
-          );
-        }
-
-        watch(() => props.module?.key, async (newKey, oldKey) => {
-          console.log(`[CrudView] 模块切换: ${oldKey} -> ${newKey}, url="${props.module?.list?.url}"`);
-          // 清空旧数据，避免显示错误的数据
-          rows.value = [];
-          initForms();
-          await loadList();
-        }, { immediate: true });
-
-        watch(() => props.authVersion, async () => {
-          // login/logout 后自动刷新当前模块
-          initForms();
-          await loadList();
-        });
-
-        async function exportExcel(moduleKey) {
-          try {
-            const m = props.module;
-            if (!m) return;
-            
-            let url = '';
-            const params = new URLSearchParams();
-            
-            if (moduleKey === 'transactions') {
-              // 导出交易明细
-              url = '/api/financial/export/transactions';
-              if (listParams.value.employeeId) params.append('employeeId', listParams.value.employeeId);
-              if (listParams.value.month) params.append('month', listParams.value.month);
-              if (listParams.value.transactionType) params.append('transactionType', listParams.value.transactionType);
-            } else if (moduleKey === 'cardSummary') {
-              // 导出提成统计（使用月份参数）
-              url = '/api/financial/export/commission-stats';
-              const month = listParams.value.month || dayjs().format('YYYY-MM');
-              params.append('month', month);
-            } else {
-              ElementPlus.ElMessage.warning('该模块不支持导出');
+          async function doDelete(row) {
+            errorText.value = '';
+            try {
+              await ElementPlus.ElMessageBox.confirm('确认删除该记录？此操作不可撤销。', '删除确认', {
+                confirmButtonText: '删除',
+                cancelButtonText: '取消',
+                type: 'warning'
+              });
+            } catch {
               return;
             }
-            
-            const queryString = params.toString();
-            const fullUrl = `http://localhost:8080${url}${queryString ? '?' + queryString : ''}`;
-            const token = localStorage.getItem('token') || '';
-            
-            // 使用fetch下载文件
-            const response = await fetch(fullUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
-            
-            if (!response.ok) {
-              throw new Error(`导出失败: ${response.status} ${response.statusText}`);
+            loading.value = true;
+            try {
+              const url = props.module.delete.url(row);
+              const res = await http.delete(url);
+              const body = res.data || {};
+              if (body.code !== 200) throw new Error(body.message || '删除失败');
+              ElementPlus.ElMessage.success(body.message || '删除成功');
+              await loadList();
+            } catch (e) {
+              const serverMsg = e?.response?.data?.message;
+              ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
+            } finally {
+              loading.value = false;
             }
-            
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            
-            // 从Content-Disposition头获取文件名，或使用默认名称
-            const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'export.xlsx';
-            if (contentDisposition) {
-              const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-              if (filenameMatch && filenameMatch[1]) {
-                filename = filenameMatch[1].replace(/['"]/g, '');
-                // 处理UTF-8编码的文件名
-                if (filename.startsWith('UTF-8\'\'')) {
-                  filename = decodeURIComponent(filename.replace(/^UTF-8''/, ''));
-                }
-              }
-            }
-            
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(downloadUrl);
-            
-            ElementPlus.ElMessage.success('导出成功');
-          } catch (e) {
-            console.error('[exportExcel] 导出失败:', e);
-            ElementPlus.ElMessage.error(e?.message || '导出失败');
           }
-        }
 
-        return {
-          loading, rows, errorText,
-          createDialogVisible, createForm, createFormRef,
-          editDialogVisible, editForm,
-          listParams,
-          canCreate, canDelete, canUpdate, canRead, isReadOnly,
-          loadList, openCreate, submitCreate, openEdit, submitEdit, doDelete,
-          doCheckin, openCheckinHistory,
-          checkinHistoryVisible, checkinHistory, currentCheckinMember, checkinLoading,
-          openRenew, submitRenew, openRenewHistory,
-          renewDialogVisible, renewForm, renewLoading, currentRenewMember,
-          renewHistoryVisible, renewHistory, renewHistoryLoading,
-          exportExcel,
-          openCardDetail,
-          cardDetailVisible, cardDetailList, currentCardDetailEmployee,
-          summaryInfo,
-          formatValue, renderField,
-          employees: computed(() => Array.isArray(props.employees) ? props.employees : []),
-          // 将 props 也返回，以便在 render 中使用
-          cardTypes: computed(() => Array.isArray(props.cardTypes) ? props.cardTypes : []),
-          employeesList: computed(() => Array.isArray(props.employees) ? props.employees : [])
-        };
-      },
-      render() {
-        const m = this.module;
-        // 在 render 中通过 this 访问 setup 返回的 computed
-        const cardTypes = this.cardTypes || [];
-        const employees = this.employeesList || [];
+          async function doCheckin(row) {
+            checkinLoading.value = true;
+            try {
+              const res = await http.post(`/api/members/${row.id}/checkin`);
+              const body = res.data || {};
+              if (body.code !== 200) throw new Error(body.message || '签到失败');
+              ElementPlus.ElMessage.success(body.message || '签到成功');
+              await loadList(); // 刷新列表
+            } catch (e) {
+              const serverMsg = e?.response?.data?.message;
+              ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
+            } finally {
+              checkinLoading.value = false;
+            }
+          }
 
-        return h('div', { class: 'card' }, [
-          h('div', { class: 'toolbar' }, [
-            h('div', { class: 'toolbar-left' }, [
-              h('div', { style: 'font-size: 16px; font-weight: 700;' }, m.title),
-              this.isReadOnly ? h('span', { class: 'muted' }, '（只读）') : null
-            ]),
-            h('div', { class: 'toolbar-left' }, [
-              ...(m.listParams || []).map(p => {
-                if (p.type === 'month') {
-                  return h(ElementPlus.ElDatePicker, {
+          async function openCheckinHistory(row) {
+            currentCheckinMember.value = row;
+            checkinLoading.value = true;
+            try {
+              const res = await http.get(`/api/members/${row.id}/checkins`);
+              const body = res.data || {};
+              if (body.code === 200 && Array.isArray(body.data)) {
+                checkinHistory.value = body.data;
+              } else {
+                checkinHistory.value = [];
+              }
+              checkinHistoryVisible.value = true;
+            } catch (e) {
+              ElementPlus.ElMessage.error('加载签到历史失败：' + (e?.message || String(e)));
+              checkinHistory.value = [];
+            } finally {
+              checkinLoading.value = false;
+            }
+          }
+
+          function openCardDetail(row) {
+            currentCardDetailEmployee.value = row;
+            if (row?.cardMembers && Array.isArray(row.cardMembers)) {
+              cardDetailList.value = row.cardMembers;
+            } else {
+              cardDetailList.value = [];
+            }
+            cardDetailVisible.value = true;
+          }
+
+          async function openRenew(row) {
+            currentRenewMember.value = row;
+            renewForm.memberId = row.id;
+            renewForm.cardTypeId = row.cardTypeId || null;
+            renewForm.renewDate = dayjs().format('YYYY-MM-DD');
+            renewForm.employeeId = props.currentEmployeeId || null;
+            renewForm.remark = '';
+            // 打开对话框前重新加载卡种列表，确保显示最新的启用状态
+            if (props.onRefreshCardTypes && typeof props.onRefreshCardTypes === 'function') {
+              try {
+                await props.onRefreshCardTypes();
+                console.log('[openRenew] 已重新加载卡种列表');
+              } catch (e) {
+                console.warn('[openRenew] 重新加载卡种列表失败:', e);
+              }
+            }
+            // 确保员工数据已加载
+            if (props.onRefreshEmployees && typeof props.onRefreshEmployees === 'function') {
+              try {
+                await props.onRefreshEmployees();
+                console.log('[openRenew] 已重新加载员工列表');
+              } catch (e) {
+                console.warn('[openRenew] 重新加载员工列表失败:', e);
+              }
+            }
+            renewDialogVisible.value = true;
+          }
+
+          async function submitRenew() {
+            if (!renewForm.memberId || !renewForm.cardTypeId || !renewForm.renewDate) {
+              ElementPlus.ElMessage.warning('请填写完整信息');
+              return;
+            }
+            renewLoading.value = true;
+            try {
+              const res = await http.post('/api/members/renew', {
+                memberId: renewForm.memberId,
+                cardTypeId: renewForm.cardTypeId,
+                renewDate: renewForm.renewDate,
+                employeeId: renewForm.employeeId || props.currentEmployeeId,
+                remark: renewForm.remark || null
+              });
+              const body = res.data || {};
+              if (body.code !== 200) throw new Error(body.message || '续卡失败');
+              ElementPlus.ElMessage.success(body.message || '续卡成功');
+              renewDialogVisible.value = false;
+              await loadList(); // 刷新列表
+            } catch (e) {
+              const serverMsg = e?.response?.data?.message;
+              ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
+            } finally {
+              renewLoading.value = false;
+            }
+          }
+
+          async function openRenewHistory(row) {
+            currentRenewMember.value = row;
+            renewHistoryLoading.value = true;
+            try {
+              const res = await http.get(`/api/members/${row.id}/renew-history`);
+              const body = res.data || {};
+              if (body.code === 200 && Array.isArray(body.data)) {
+                renewHistory.value = body.data;
+              } else {
+                renewHistory.value = [];
+              }
+              renewHistoryVisible.value = true;
+            } catch (e) {
+              ElementPlus.ElMessage.error('加载续卡历史失败：' + (e?.message || String(e)));
+              renewHistory.value = [];
+            } finally {
+              renewHistoryLoading.value = false;
+            }
+          }
+
+          function renderField(field, form) {
+            const modelKey = field.key;
+            const label = field.label || field.key;
+            const target = form || createForm;
+
+            // remainingTimes: 只在选择次卡时显示
+            if (modelKey === 'remainingTimes') {
+              const cardTypeId = target.cardTypeId;
+              const selectedCardType = props.cardTypes?.find(ct => ct.id === cardTypeId);
+              const isTimesCard = selectedCardType?.type === 'TIMES';
+
+              // 如果不是次卡，不显示该字段
+              if (!isTimesCard) {
+                return null;
+              }
+
+              // 如果是次卡，显示数字输入框
+              return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
+                      h(ElementPlus.ElInputNumber, {
+                        modelValue: target[modelKey],
+                        'onUpdate:modelValue': (v) => target[modelKey] = v,
+                        controlsPosition: 'right',
+                        class: 'full-width',
+                        min: 0
+                      })
+              );
+            }
+
+            // number-ish -> input-number (must win over "time" substring, e.g. remainingTimes)
+            if (field.type === 'number') {
+              return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
+                      h(ElementPlus.ElInputNumber, {
+                        modelValue: target[modelKey],
+                        'onUpdate:modelValue': (v) => target[modelKey] = v,
+                        controlsPosition: 'right',
+                        class: 'full-width'
+                      })
+              );
+            }
+
+            // status switch (1/0)
+            if (field.type === 'switch' || modelKey === 'status') {
+              return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
+                      h(ElementPlus.ElSwitch, {
+                        modelValue: target[modelKey] === 1 || target[modelKey] === '1' || target[modelKey] === true,
+                        'onUpdate:modelValue': (v) => target[modelKey] = v ? 1 : 0,
+                        activeText: '启用',
+                        inactiveText: '禁用'
+                      })
+              );
+            }
+
+            // select
+            if (field.type === 'select') {
+              const opts = typeof field.options === 'function'
+                      ? field.options({ currentEmployeeId: props.currentEmployeeId, module: props.module, cardTypes: props.cardTypes, employees: props.employees })
+                      : (field.options || []);
+              // 调试：如果是员工选择框，打印选项
+              if (modelKey === 'employeeId') {
+                console.log('[renderField] employeeId 字段 - employees prop:', props.employees);
+                console.log('[renderField] employeeId 字段 - options:', opts);
+              }
+              return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
+                      h(ElementPlus.ElSelect, {
+                        modelValue: target[modelKey],
+                        'onUpdate:modelValue': (v) => {
+                          target[modelKey] = v;
+                          // 如果选择的是卡种，且是次卡，自动填充剩余次数
+                          if (modelKey === 'cardTypeId' && form === createForm) {
+                            const selectedCardType = props.cardTypes?.find(ct => ct.id === v);
+                            if (selectedCardType?.type === 'TIMES') {
+                              createForm.remainingTimes = selectedCardType.duration || 0;
+                            } else {
+                              // 如果不是次卡，清空剩余次数
+                              createForm.remainingTimes = null;
+                            }
+                          }
+                          // 编辑表单也做同样处理
+                          if (modelKey === 'cardTypeId' && form === editForm) {
+                            const selectedCardType = props.cardTypes?.find(ct => ct.id === v);
+                            if (selectedCardType?.type === 'TIMES') {
+                              editForm.remainingTimes = selectedCardType.duration || editForm.remainingTimes || 0;
+                            } else {
+                              editForm.remainingTimes = null;
+                            }
+                          }
+                        },
+                        filterable: true,
+                        clearable: true,
+                        placeholder: field.placeholder || '请选择',
+                        class: 'full-width'
+                      }, () => opts.map(o =>
+                              h(ElementPlus.ElOption, { key: String(o.value), label: o.label, value: o.value })
+                      ))
+              );
+            }
+
+            // Date-ish fields -> date picker
+            if (field.type === 'date' || (!field.type && isDateKey(field.key))) {
+              return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
+                      h(ElementPlus.ElDatePicker, {
+                        modelValue: target[modelKey],
+                        'onUpdate:modelValue': (v) => target[modelKey] = v,
+                        type: 'date',
+                        valueFormat: 'YYYY-MM-DD',
+                        format: 'YYYY-MM-DD',
+                        placeholder: '请选择日期',
+                        class: 'full-width'
+                      })
+              );
+            }
+
+            // default -> input
+            return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
+                    h(ElementPlus.ElInput, {
+                      modelValue: target[modelKey],
+                      'onUpdate:modelValue': (v) => target[modelKey] = v,
+                      placeholder: '请输入',
+                      clearable: true
+                    })
+            );
+          }
+
+          watch(() => props.module?.key, async (newKey, oldKey) => {
+            console.log(`[CrudView] 模块切换: ${oldKey} -> ${newKey}, url="${props.module?.list?.url}"`);
+            // 清空旧数据，避免显示错误的数据
+            rows.value = [];
+            initForms();
+            await loadList();
+          }, { immediate: true });
+
+          watch(() => props.authVersion, async () => {
+            // login/logout 后自动刷新当前模块
+            initForms();
+            await loadList();
+          });
+
+          return {
+            loading, rows, errorText,
+            createDialogVisible, createForm, createFormRef,
+            editDialogVisible, editForm,
+            listParams,
+            canCreate, canDelete, canUpdate, isReadOnly,
+            loadList, openCreate, submitCreate, openEdit, submitEdit, doDelete,
+            doCheckin, openCheckinHistory,
+            checkinHistoryVisible, checkinHistory, currentCheckinMember, checkinLoading,
+            openRenew, submitRenew, openRenewHistory,
+            renewDialogVisible, renewForm, renewLoading, currentRenewMember,
+            renewHistoryVisible, renewHistory, renewHistoryLoading,
+            openCardDetail,
+            cardDetailVisible, cardDetailList, currentCardDetailEmployee,
+            summaryInfo,
+            formatValue, renderField,
+            employees: computed(() => Array.isArray(props.employees) ? props.employees : []),
+            // 将 props 也返回，以便在 render 中使用
+            cardTypes: computed(() => Array.isArray(props.cardTypes) ? props.cardTypes : []),
+            employeesList: computed(() => Array.isArray(props.employees) ? props.employees : [])
+          };
+        },
+        render() {
+          const m = this.module;
+          // 在 render 中通过 this 访问 setup 返回的 computed
+          const cardTypes = this.cardTypes || [];
+          const employees = this.employeesList || [];
+
+          return h('div', { class: 'card' }, [
+            h('div', { class: 'toolbar' }, [
+              h('div', { class: 'toolbar-left' }, [
+                h('div', { style: 'font-size: 16px; font-weight: 700;' }, m.title),
+                this.isReadOnly ? h('span', { class: 'muted' }, '（只读）') : null
+              ]),
+              h('div', { class: 'toolbar-left' }, [
+                ...(m.listParams || []).map(p => {
+                  if (p.type === 'month') {
+                    return h(ElementPlus.ElDatePicker, {
+                      key: p.key,
+                      modelValue: this.listParams[p.key],
+                      'onUpdate:modelValue': (v) => this.listParams[p.key] = v,
+                      type: 'month',
+                      placeholder: p.placeholder || '选择月份',
+                      valueFormat: 'YYYY-MM',
+                      format: 'YYYY-MM',
+                      style: 'width: 160px;'
+                    });
+                  }
+                  return h(ElementPlus.ElInput, {
                     key: p.key,
                     modelValue: this.listParams[p.key],
                     'onUpdate:modelValue': (v) => this.listParams[p.key] = v,
-                    type: 'month',
-                    placeholder: p.placeholder || '选择月份',
-                    valueFormat: 'YYYY-MM',
-                    format: 'YYYY-MM',
-                    style: 'width: 160px;'
+                    placeholder: p.placeholder || ('筛选 ' + p.key),
+                    clearable: true,
+                    style: 'width: 180px;'
                   });
-                }
-                return h(ElementPlus.ElInput, {
-                  key: p.key,
-                  modelValue: this.listParams[p.key],
-                  'onUpdate:modelValue': (v) => this.listParams[p.key] = v,
-                  placeholder: p.placeholder || ('筛选 ' + p.key),
-                  clearable: true,
-                  style: 'width: 180px;'
-                });
-              }),
-              h(ElementPlus.ElButton, { type: 'primary', onClick: this.loadList }, () => '刷新'),
-              this.canCreate ? h(ElementPlus.ElButton, { type: 'success', onClick: this.openCreate }, () => '新增') : null,
-              // Excel导出按钮（仅财务统计相关模块显示）
-              (m.key === 'transactions' || m.key === 'cardSummary' ? h(ElementPlus.ElButton, { 
-                type: 'warning', 
-                icon: 'Download',
-                onClick: () => this.exportExcel(m.key)
-              }, () => '导出Excel') : null)
-            ])
-          ]),
+                }),
+                h(ElementPlus.ElButton, { type: 'primary', onClick: this.loadList }, () => '刷新'),
+                this.canCreate ? h(ElementPlus.ElButton, { type: 'success', onClick: this.openCreate }, () => '新增') : null
+              ])
+            ]),
 
-          this.errorText ? h(ElementPlus.ElAlert, { type: 'error', title: this.errorText, showIcon: true, closable: true }) : null,
+            this.errorText ? h(ElementPlus.ElAlert, { type: 'error', title: this.errorText, showIcon: true, closable: true }) : null,
 
-          // 开卡统计汇总信息（仅开卡统计模块显示）
-          (m.key === 'cardSummary' && this.summaryInfo ? h(ElementPlus.ElCard, {
-            style: 'margin-top: 12px; margin-bottom: 12px;',
-            shadow: 'never'
-          }, {
-            default: () => [
-              h('div', { style: 'display: flex; gap: 24px; align-items: center;' }, [
-                h('div', { style: 'font-size: 14px;' }, [
-                  h('span', { style: 'color: #909399;' }, '月份：'),
-                  h('span', { style: 'font-weight: bold; margin-left: 8px;' }, this.summaryInfo.month || '')
-                ]),
-                h('div', { style: 'font-size: 14px;' }, [
-                  h('span', { style: 'color: #909399;' }, '总开卡数量：'),
-                  h('span', { style: 'font-weight: bold; color: #409EFF; margin-left: 8px;' }, this.summaryInfo.totalCardCount || 0)
-                ]),
-                h('div', { style: 'font-size: 14px;' }, [
-                  h('span', { style: 'color: #909399;' }, '总开卡金额：'),
-                  h('span', { style: 'font-weight: bold; color: #67C23A; margin-left: 8px;' }, 
-                    `¥${Number(this.summaryInfo.totalCardAmount || 0).toFixed(2)}`)
-                ]),
-                h('div', { style: 'font-size: 14px;' }, [
-                  h('span', { style: 'color: #909399;' }, '总提成金额：'),
-                  h('span', { style: 'font-weight: bold; color: #E6A23C; margin-left: 8px;' }, 
-                    `¥${(Number(this.summaryInfo.totalCardAmount || 0) * 0.02).toFixed(2)}`)
+            // 开卡统计汇总信息（仅开卡统计模块显示）
+            (m.key === 'cardSummary' && this.summaryInfo ? h(ElementPlus.ElCard, {
+              style: 'margin-top: 12px; margin-bottom: 12px;',
+              shadow: 'never'
+            }, {
+              default: () => [
+                h('div', { style: 'display: flex; gap: 24px; align-items: center;' }, [
+                  h('div', { style: 'font-size: 14px;' }, [
+                    h('span', { style: 'color: #909399;' }, '月份：'),
+                    h('span', { style: 'font-weight: bold; margin-left: 8px;' }, this.summaryInfo.month || '')
+                  ]),
+                  h('div', { style: 'font-size: 14px;' }, [
+                    h('span', { style: 'color: #909399;' }, '总开卡数量：'),
+                    h('span', { style: 'font-weight: bold; color: #409EFF; margin-left: 8px;' }, this.summaryInfo.totalCardCount || 0)
+                  ]),
+                  h('div', { style: 'font-size: 14px;' }, [
+                    h('span', { style: 'color: #909399;' }, '总开卡金额：'),
+                    h('span', { style: 'font-weight: bold; color: #67C23A; margin-left: 8px;' },
+                            `¥${Number(this.summaryInfo.totalCardAmount || 0).toFixed(2)}`)
+                  ]),
+                  h('div', { style: 'font-size: 14px;' }, [
+                    h('span', { style: 'color: #909399;' }, '总提成金额：'),
+                    h('span', { style: 'font-weight: bold; color: #E6A23C; margin-left: 8px;' },
+                            `¥${(Number(this.summaryInfo.totalCardAmount || 0) * 0.02).toFixed(2)}`)
+                  ])
                 ])
-              ])
-            ]
-          }) : null),
+              ]
+            }) : null),
 
-          h(ElementPlus.ElTable, {
-            data: this.rows,
-            stripe: true,
-            border: true,
-            size: 'default',
-            style: 'width: 100%; margin-top: 12px;',
-            height: m.tableHeight || undefined,
-            // loading overlay for table
-            loading: this.loading
-          }, {
-            default: () => [
-              ...(m.columns || []).map(col => h(ElementPlus.ElTableColumn, {
-                key: col.key,
-                prop: col.key,
-                label: col.label || col.key,
-                minWidth: col.minWidth || 120,
-                showOverflowTooltip: true,
-                formatter: (row, column, cellValue) => {
-                  if (typeof col.value === 'function') {
-                    // 如果是员工ID列，传递员工列表给value函数
-                    if (col.key === 'firstEmployeeId' || col.key === 'lastEmployeeId') {
-                      const employeesList = Array.isArray(this.employees) ? this.employees : [];
-                      return col.value(row, employeesList);
-                    }
-                    // 如果是到期提醒列，需要特殊处理样式
-                    if (col.key === 'expireWarning') {
-                      const warningText = col.value(row);
-                      if (!warningText) return '';
-                      const expireDate = row?.expireDate ? dayjs(row.expireDate) : null;
-                      const today = dayjs();
-                      const daysLeft = expireDate ? expireDate.diff(today, 'day') : 0;
-                      // 7天内到期或已过期，标红
-                      if (daysLeft <= 7) {
-                        return h('span', { style: 'color: #f56c6c; font-weight: bold;' }, warningText);
+            h(ElementPlus.ElTable, {
+              data: this.rows,
+              stripe: true,
+              border: true,
+              size: 'default',
+              style: 'width: 100%; margin-top: 12px;',
+              height: m.tableHeight || undefined,
+              // loading overlay for table
+              loading: this.loading
+            }, {
+              default: () => [
+                ...(m.columns || []).map(col => h(ElementPlus.ElTableColumn, {
+                  key: col.key,
+                  prop: col.key,
+                  label: col.label || col.key,
+                  minWidth: col.minWidth || 120,
+                  showOverflowTooltip: true,
+                  formatter: (row, column, cellValue) => {
+                    if (typeof col.value === 'function') {
+                      // 如果是员工ID列，传递员工列表给value函数
+                      if (col.key === 'firstEmployeeId' || col.key === 'lastEmployeeId') {
+                        const employeesList = Array.isArray(this.employees) ? this.employees : [];
+                        return col.value(row, employeesList);
                       }
-                      return warningText;
-                    }
-                    // 如果超过7天未签到列，需要特殊处理样式
-                    if (col.key === 'noCheckinOver7Days') {
-                      const text = col.value(row);
-                      // 如果超过7天未签到，标红
-                      if (row?.noCheckinOver7Days === 1) {
-                        return h('span', { style: 'color: #f56c6c; font-weight: bold;' }, text);
+                      // 如果是到期提醒列，需要特殊处理样式
+                      if (col.key === 'expireWarning') {
+                        const warningText = col.value(row);
+                        if (!warningText) return '';
+                        const expireDate = row?.expireDate ? dayjs(row.expireDate) : null;
+                        const today = dayjs();
+                        const daysLeft = expireDate ? expireDate.diff(today, 'day') : 0;
+                        // 7天内到期或已过期，标红
+                        if (daysLeft <= 7) {
+                          return h('span', { style: 'color: #f56c6c; font-weight: bold;' }, warningText);
+                        }
+                        return warningText;
                       }
-                      return text;
-                    }
-                    // 如果是开卡明细列，添加点击功能
-                    if (col.key === 'cardMembers' && col.clickable) {
-                      const text = col.value(row);
-                      if (!text || text === '无') return text;
-                      return h('span', {
-                        style: 'color: #409EFF; cursor: pointer; text-decoration: underline;',
-                        onClick: (e) => {
-                          e.stopPropagation();
-                          this.openCardDetail(row);
+                      // 如果超过7天未签到列，需要特殊处理样式
+                      if (col.key === 'noCheckinOver7Days') {
+                        const text = col.value(row);
+                        // 如果超过7天未签到，标红
+                        if (row?.noCheckinOver7Days === 1) {
+                          return h('span', { style: 'color: #f56c6c; font-weight: bold;' }, text);
                         }
-                      }, text);
-                    }
-                    return col.value(row);
-                  }
-                  if (col.key === 'status') {
-                    const enabled = (cellValue === 1 || cellValue === '1');
-                    return enabled ? '启用' : '禁用';
-                  }
-                  return formatValue(col.key, cellValue);
-                }
-              })),
-              // 操作列：对于members模块，只要有查看权限就显示操作列（基础操作如签到、续卡等）
-              // 对于其他模块，需要有更新或删除权限才显示
-              ((m.key === 'members' && this.canRead) || (m.key !== 'members' && (this.canDelete || this.canUpdate))) ? h(ElementPlus.ElTableColumn, {
-                label: '操作',
-                fixed: 'right',
-                width: m.key === 'members' ? 360 : 200
-              }, {
-                default: ({ row }) => h('div', { style: 'display:flex; gap:6px; flex-wrap: wrap; align-items: center;' }, [
-                  // 会员管理模块：签到按钮、续卡按钮和历史记录按钮（所有有查看权限的员工都可以使用）
-                  (m.key === 'members' && this.canRead ? [
-                    h(ElementPlus.ElButton, {
-                      type: 'success',
-                      size: 'small',
-                      icon: 'Check',
-                      loading: this.checkinLoading,
-                      onClick: () => this.doCheckin(row),
-                      style: 'border-radius: 4px; font-weight: 500;'
-                    }, () => '签到'),
-                    // 续卡需要创建权限（因为续卡会创建新的交易记录）
-                    (this.canCreate ? h(ElementPlus.ElButton, {
-                      type: 'warning',
-                      size: 'small',
-                      icon: 'Refresh',
-                      onClick: () => this.openRenew(row),
-                      style: 'border-radius: 4px; font-weight: 500;'
-                    }, () => '续卡') : null),
-                    h(ElementPlus.ElButton, {
-                      type: 'info',
-                      size: 'small',
-                      icon: 'Clock',
-                      onClick: () => this.openCheckinHistory(row),
-                      style: 'border-radius: 4px; font-weight: 500;'
-                    }, () => '签到记录'),
-                    h(ElementPlus.ElButton, {
-                      type: 'info',
-                      size: 'small',
-                      icon: 'Document',
-                      onClick: () => this.openRenewHistory(row),
-                      style: 'border-radius: 4px; font-weight: 500;'
-                    }, () => '续卡历史')
-                  ] : []),
-                  (this.canUpdate ? h(ElementPlus.ElButton, {
-                    type: 'primary',
-                    size: 'small',
-                    icon: 'Edit',
-                    onClick: () => this.openEdit(row),
-                    style: 'border-radius: 4px; font-weight: 500;'
-                  }, () => '编辑') : null),
-                  (this.canDelete ? h(ElementPlus.ElButton, {
-                    type: 'danger',
-                    size: 'small',
-                    icon: 'Delete',
-                    onClick: () => this.doDelete(row),
-                    style: 'border-radius: 4px; font-weight: 500;'
-                  }, () => '删除') : null)
-                ].flat().filter(Boolean))
-              }) : null
-            ].filter(Boolean)
-          }),
-
-          h(ElementPlus.ElDialog, {
-            modelValue: this.createDialogVisible,
-            'onUpdate:modelValue': (v) => this.createDialogVisible = v,
-            title: '新增 - ' + m.title,
-            width: '640px',
-            destroyOnClose: true
-          }, {
-            default: () => [
-              h(ElementPlus.ElForm, {
-                model: this.createForm,
-                ref: 'createFormRef',
-                labelWidth: 120
-              }, () => (m.formFields || []).map(f => this.renderField(f, this.createForm)))
-            ],
-            footer: () => [
-              h(ElementPlus.ElButton, { onClick: () => this.createDialogVisible = false }, () => '取消'),
-              h(ElementPlus.ElButton, { type: 'primary', loading: this.loading, onClick: this.submitCreate }, () => '保存')
-            ]
-          }),
-
-          h(ElementPlus.ElDialog, {
-            modelValue: this.editDialogVisible,
-            'onUpdate:modelValue': (v) => this.editDialogVisible = v,
-            title: '编辑 - ' + m.title,
-            width: '640px',
-            destroyOnClose: true
-          }, {
-            default: () => [
-              h(ElementPlus.ElForm, {
-                model: this.editForm,
-                labelWidth: 120
-              }, () => (m.formFields || []).map(f => this.renderField(f, this.editForm)))
-            ],
-            footer: () => [
-              h(ElementPlus.ElButton, { onClick: () => this.editDialogVisible = false }, () => '取消'),
-              h(ElementPlus.ElButton, { type: 'primary', loading: this.loading, onClick: this.submitEdit }, () => '保存')
-            ]
-          }),
-
-          // 签到历史对话框（仅会员管理模块）
-          (m.key === 'members' ? h(ElementPlus.ElDialog, {
-            modelValue: this.checkinHistoryVisible,
-            'onUpdate:modelValue': (v) => this.checkinHistoryVisible = v,
-            title: `签到记录 - ${this.currentCheckinMember?.name || ''}`,
-            width: '800px',
-            destroyOnClose: true
-          }, {
-            default: () => [
-              this.checkinLoading ? h(ElementPlus.ElSkeleton, { rows: 5, animated: true }) : (
-                this.checkinHistory.length === 0 
-                  ? h('div', { style: 'text-align: center; padding: 40px; color: #909399;' }, '暂无签到记录')
-                  : h(ElementPlus.ElTable, {
-                      data: this.checkinHistory,
-                      stripe: true,
-                      border: true,
-                      style: 'width: 100%;'
-                    }, {
-                      default: () => [
-                        h(ElementPlus.ElTableColumn, { prop: 'checkinDate', label: '签到日期', minWidth: 120, formatter: (row) => row.checkinDate || '' }),
-                        h(ElementPlus.ElTableColumn, { prop: 'checkinTime', label: '签到时间', minWidth: 160, formatter: (row) => row.checkinTime ? dayjs(row.checkinTime).format('YYYY-MM-DD HH:mm:ss') : '' }),
-                        h(ElementPlus.ElTableColumn, { prop: 'employee', label: '操作员工', minWidth: 120, formatter: (row) => row.employee?.name || row.employee?.username || '' }),
-                        h(ElementPlus.ElTableColumn, { prop: 'remark', label: '备注', minWidth: 150 })
-                      ]
-                    })
-              )
-            ],
-            footer: () => [
-              h(ElementPlus.ElButton, { onClick: () => this.checkinHistoryVisible = false }, () => '关闭')
-            ]
-          }) : null),
-
-          // 开卡明细对话框（仅开卡统计模块）
-          (m.key === 'cardSummary' ? h(ElementPlus.ElDialog, {
-            modelValue: this.cardDetailVisible,
-            'onUpdate:modelValue': (v) => this.cardDetailVisible = v,
-            title: `开卡明细 - ${this.currentCardDetailEmployee?.employeeName || ''}`,
-            width: '900px',
-            destroyOnClose: true
-          }, {
-            default: () => [
-              this.cardDetailList.length === 0 
-                ? h('div', { style: 'text-align: center; padding: 40px; color: #909399;' }, '暂无开卡记录')
-                : h(ElementPlus.ElTable, {
-                    data: this.cardDetailList,
-                    stripe: true,
-                    border: true,
-                    style: 'width: 100%;'
-                  }, {
-                    default: () => [
-                      h(ElementPlus.ElTableColumn, { 
-                        prop: 'memberName', 
-                        label: '会员姓名', 
-                        minWidth: 120,
-                        formatter: (row) => row.memberName || '未知'
-                      }),
-                      h(ElementPlus.ElTableColumn, { 
-                        prop: 'memberPhone', 
-                        label: '手机号', 
-                        minWidth: 120,
-                        formatter: (row) => row.memberPhone || ''
-                      }),
-                      h(ElementPlus.ElTableColumn, { 
-                        prop: 'cardTypeName', 
-                        label: '卡种', 
-                        minWidth: 120,
-                        formatter: (row) => row.cardTypeName || ''
-                      }),
-                      h(ElementPlus.ElTableColumn, { 
-                        prop: 'amount', 
-                        label: '金额', 
-                        minWidth: 120,
-                        formatter: (row) => `¥${Number(row.amount || 0).toFixed(2)}`
-                      }),
-                      h(ElementPlus.ElTableColumn, { 
-                        prop: 'createdAt', 
-                        label: '交易时间', 
-                        minWidth: 160,
-                        formatter: (row) => {
-                          // 尝试多种可能的字段名
-                          const createdAt = row.createdAt || row.created_at || row['created_at'] || row['createdAt'];
-                          if (!createdAt) {
-                            console.warn('[开卡明细] 缺少创建时间字段:', row);
-                            return '';
+                        return text;
+                      }
+                      // 如果是开卡明细列，添加点击功能
+                      if (col.key === 'cardMembers' && col.clickable) {
+                        const text = col.value(row);
+                        if (!text || text === '无') return text;
+                        return h('span', {
+                          style: 'color: #409EFF; cursor: pointer; text-decoration: underline;',
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            this.openCardDetail(row);
                           }
-                          const date = dayjs(createdAt);
-                          if (date.isValid()) {
-                            return date.format('YYYY-MM-DD HH:mm:ss');
-                          }
-                          // 如果dayjs解析失败，尝试直接显示
-                          return String(createdAt);
-                        }
-                      }),
-                      h(ElementPlus.ElTableColumn, { 
-                        prop: 'transactionType', 
-                        label: '类型', 
-                        minWidth: 100,
-                        formatter: (row) => {
-                          const type = row.transactionType || '';
-                          if (type === 'NEW') return h('span', { style: 'color: #67C23A; font-weight: bold;' }, '新开卡');
-                          if (type === 'RENEW') return h('span', { style: 'color: #409EFF; font-weight: bold;' }, '续费');
-                          return type;
-                        }
-                      })
-                    ]
-                  })
-            ],
-            footer: () => [
-              h(ElementPlus.ElButton, { onClick: () => this.cardDetailVisible = false }, () => '关闭')
-            ]
-          }) : null),
+                        }, text);
+                      }
+                      return col.value(row);
+                    }
+                    if (col.key === 'status') {
+                      const enabled = (cellValue === 1 || cellValue === '1');
+                      return enabled ? '启用' : '禁用';
+                    }
+                    return formatValue(col.key, cellValue);
+                  }
+                })),
+                ((this.canDelete || this.canUpdate || m.key === 'members') ? h(ElementPlus.ElTableColumn, {
+                  label: '操作',
+                  fixed: 'right',
+                  width: m.key === 'members' ? 360 : 200
+                }, {
+                  default: ({ row }) => h('div', { style: 'display:flex; gap:6px; flex-wrap: wrap; align-items: center;' }, [
+                    // 会员管理模块：签到按钮、续卡按钮和历史记录按钮
+                    (m.key === 'members' ? [
+                      h(ElementPlus.ElButton, {
+                        type: 'success',
+                        size: 'small',
+                        icon: 'Check',
+                        loading: this.checkinLoading,
+                        onClick: () => this.doCheckin(row),
+                        style: 'border-radius: 4px; font-weight: 500;'
+                      }, () => '签到'),
+                      h(ElementPlus.ElButton, {
+                        type: 'warning',
+                        size: 'small',
+                        icon: 'Refresh',
+                        onClick: () => this.openRenew(row),
+                        style: 'border-radius: 4px; font-weight: 500;'
+                      }, () => '续卡'),
+                      h(ElementPlus.ElButton, {
+                        type: 'info',
+                        size: 'small',
+                        icon: 'Clock',
+                        onClick: () => this.openCheckinHistory(row),
+                        style: 'border-radius: 4px; font-weight: 500;'
+                      }, () => '签到记录'),
+                      h(ElementPlus.ElButton, {
+                        type: 'info',
+                        size: 'small',
+                        icon: 'Document',
+                        onClick: () => this.openRenewHistory(row),
+                        style: 'border-radius: 4px; font-weight: 500;'
+                      }, () => '续卡历史')
+                    ] : []),
+                    (this.canUpdate ? h(ElementPlus.ElButton, {
+                      type: 'primary',
+                      size: 'small',
+                      icon: 'Edit',
+                      onClick: () => this.openEdit(row),
+                      style: 'border-radius: 4px; font-weight: 500;'
+                    }, () => '编辑') : null),
+                    (this.canDelete ? h(ElementPlus.ElButton, {
+                      type: 'danger',
+                      size: 'small',
+                      icon: 'Delete',
+                      onClick: () => this.doDelete(row),
+                      style: 'border-radius: 4px; font-weight: 500;'
+                    }, () => '删除') : null)
+                  ].flat().filter(Boolean))
+                }) : null)
+              ].filter(Boolean)
+            }),
 
-          // 续卡对话框（仅会员管理模块）
-          (m.key === 'members' ? h(ElementPlus.ElDialog, {
-            modelValue: this.renewDialogVisible,
-            'onUpdate:modelValue': (v) => this.renewDialogVisible = v,
-            title: `续卡 - ${this.currentRenewMember?.name || ''}`,
-            width: '600px',
-            destroyOnClose: true
-          }, {
-            default: () => [
-              h(ElementPlus.ElForm, {
-                model: this.renewForm,
-                labelWidth: 120
-              }, () => [
-                h(ElementPlus.ElFormItem, { label: '卡种', required: true }, () =>
-                  h(ElementPlus.ElSelect, {
-                    modelValue: this.renewForm.cardTypeId,
-                    'onUpdate:modelValue': (v) => this.renewForm.cardTypeId = v,
-                    filterable: true,
-                    clearable: true,
-                    placeholder: '请选择卡种',
-                    style: 'width: 100%;'
-                  }, () => {
-                    const cardTypesList = this.cardTypes || [];
-                    console.log('[续卡对话框] 卡种列表:', cardTypesList);
-                    return cardTypesList.filter(ct => ct && ct.status === 1).map(ct =>
-                      h(ElementPlus.ElOption, { key: String(ct.id), label: `${ct.name} (¥${Number(ct.price || 0).toFixed(2)})`, value: ct.id })
-                    );
-                  })
-                ),
-                h(ElementPlus.ElFormItem, { label: '续卡日期', required: true }, () =>
-                  h(ElementPlus.ElDatePicker, {
-                    modelValue: this.renewForm.renewDate,
-                    'onUpdate:modelValue': (v) => this.renewForm.renewDate = v,
-                    type: 'date',
-                    format: 'YYYY-MM-DD',
-                    valueFormat: 'YYYY-MM-DD',
-                    placeholder: '选择续卡日期',
-                    style: 'width: 100%;'
-                  })
-                ),
-                h(ElementPlus.ElFormItem, { label: '操作员工' }, () =>
-                  h(ElementPlus.ElSelect, {
-                    modelValue: this.renewForm.employeeId,
-                    'onUpdate:modelValue': (v) => this.renewForm.employeeId = v,
-                    filterable: true,
-                    clearable: true,
-                    placeholder: '请选择员工',
-                    style: 'width: 100%;'
-                  }, () => {
-                    const employeesList = this.employeesList || [];
-                    console.log('[续卡对话框] 员工列表:', employeesList);
-                    return employeesList.filter(emp => emp && emp.status !== 0).map(emp =>
-                      h(ElementPlus.ElOption, { key: String(emp.id), label: `${emp.name || ''} (${emp.username || ''})`, value: emp.id })
-                    );
-                  })
-                ),
-                h(ElementPlus.ElFormItem, { label: '备注' }, () =>
-                  h(ElementPlus.ElInput, {
-                    modelValue: this.renewForm.remark,
-                    'onUpdate:modelValue': (v) => this.renewForm.remark = v,
-                    type: 'textarea',
-                    rows: 3,
-                    placeholder: '请输入备注（可选）'
-                  })
+            h(ElementPlus.ElDialog, {
+              modelValue: this.createDialogVisible,
+              'onUpdate:modelValue': (v) => this.createDialogVisible = v,
+              title: '新增 - ' + m.title,
+              width: '640px',
+              destroyOnClose: true
+            }, {
+              default: () => [
+                h(ElementPlus.ElForm, {
+                  model: this.createForm,
+                  ref: 'createFormRef',
+                  labelWidth: 120
+                }, () => (m.formFields || []).map(f => this.renderField(f, this.createForm)))
+              ],
+              footer: () => [
+                h(ElementPlus.ElButton, { onClick: () => this.createDialogVisible = false }, () => '取消'),
+                h(ElementPlus.ElButton, { type: 'primary', loading: this.loading, onClick: this.submitCreate }, () => '保存')
+              ]
+            }),
+
+            h(ElementPlus.ElDialog, {
+              modelValue: this.editDialogVisible,
+              'onUpdate:modelValue': (v) => this.editDialogVisible = v,
+              title: '编辑 - ' + m.title,
+              width: '640px',
+              destroyOnClose: true
+            }, {
+              default: () => [
+                h(ElementPlus.ElForm, {
+                  model: this.editForm,
+                  labelWidth: 120
+                }, () => (m.formFields || []).map(f => this.renderField(f, this.editForm)))
+              ],
+              footer: () => [
+                h(ElementPlus.ElButton, { onClick: () => this.editDialogVisible = false }, () => '取消'),
+                h(ElementPlus.ElButton, { type: 'primary', loading: this.loading, onClick: this.submitEdit }, () => '保存')
+              ]
+            }),
+
+            // 签到历史对话框（仅会员管理模块）
+            (m.key === 'members' ? h(ElementPlus.ElDialog, {
+              modelValue: this.checkinHistoryVisible,
+              'onUpdate:modelValue': (v) => this.checkinHistoryVisible = v,
+              title: `签到记录 - ${this.currentCheckinMember?.name || ''}`,
+              width: '800px',
+              destroyOnClose: true
+            }, {
+              default: () => [
+                this.checkinLoading ? h(ElementPlus.ElSkeleton, { rows: 5, animated: true }) : (
+                        this.checkinHistory.length === 0
+                                ? h('div', { style: 'text-align: center; padding: 40px; color: #909399;' }, '暂无签到记录')
+                                : h(ElementPlus.ElTable, {
+                                  data: this.checkinHistory,
+                                  stripe: true,
+                                  border: true,
+                                  style: 'width: 100%;'
+                                }, {
+                                  default: () => [
+                                    h(ElementPlus.ElTableColumn, { prop: 'checkinDate', label: '签到日期', minWidth: 120, formatter: (row) => row.checkinDate || '' }),
+                                    h(ElementPlus.ElTableColumn, { prop: 'checkinTime', label: '签到时间', minWidth: 160, formatter: (row) => row.checkinTime ? dayjs(row.checkinTime).format('YYYY-MM-DD HH:mm:ss') : '' }),
+                                    h(ElementPlus.ElTableColumn, { prop: 'employee', label: '操作员工', minWidth: 120, formatter: (row) => row.employee?.name || row.employee?.username || '' }),
+                                    h(ElementPlus.ElTableColumn, { prop: 'remark', label: '备注', minWidth: 150 })
+                                  ]
+                                })
                 )
-              ])
-            ],
-            footer: () => [
-              h(ElementPlus.ElButton, { onClick: () => this.renewDialogVisible = false }, () => '取消'),
-              h(ElementPlus.ElButton, { type: 'primary', loading: this.renewLoading, onClick: this.submitRenew }, () => '确认续卡')
-            ]
-          }) : null),
+              ],
+              footer: () => [
+                h(ElementPlus.ElButton, { onClick: () => this.checkinHistoryVisible = false }, () => '关闭')
+              ]
+            }) : null),
 
-          // 续卡历史对话框（仅会员管理模块，包含首次办卡和续卡记录）
-          (m.key === 'members' ? h(ElementPlus.ElDialog, {
-            modelValue: this.renewHistoryVisible,
-            'onUpdate:modelValue': (v) => this.renewHistoryVisible = v,
-            title: `办卡历史 - ${this.currentRenewMember?.name || ''}`,
-            width: '900px',
-            destroyOnClose: true
-          }, {
-            default: () => [
-              this.renewHistoryLoading ? h(ElementPlus.ElSkeleton, { rows: 5, animated: true }) : (
-                this.renewHistory.length === 0 
-                  ? h('div', { style: 'text-align: center; padding: 40px; color: #909399;' }, '暂无办卡记录')
-                  : h(ElementPlus.ElTable, {
-                      data: this.renewHistory,
-                      stripe: true,
-                      border: true,
-                      style: 'width: 100%;'
-                    }, {
-                      default: () => [
-                        h(ElementPlus.ElTableColumn, { 
-                          prop: 'transactionType', 
-                          label: '类型', 
-                          minWidth: 120,
-                          formatter: (row) => {
-                            const type = row.transactionType || '';
-                            if (type === 'NEW') return '新会员办卡';
-                            if (type === 'RENEW') return '旧会员续卡';
-                            return type;
-                          }
-                        }),
-                        h(ElementPlus.ElTableColumn, { 
-                          prop: 'cardType', 
-                          label: '卡种', 
-                          minWidth: 120,
-                          formatter: (row) => row.cardType?.name || row.cardTypeName || ''
-                        }),
-                        h(ElementPlus.ElTableColumn, { 
-                          prop: 'amount', 
-                          label: '金额', 
-                          minWidth: 120,
-                          formatter: (row) => `¥${Number(row.amount || 0).toFixed(2)}`
-                        }),
-                        h(ElementPlus.ElTableColumn, { 
-                          prop: 'transactionDate', 
-                          label: '交易日期', 
-                          minWidth: 120,
-                          formatter: (row) => row.transactionDate || ''
-                        }),
-                        h(ElementPlus.ElTableColumn, { 
-                          prop: 'employee', 
-                          label: '操作员工', 
-                          minWidth: 120,
-                          formatter: (row) => row.employee?.name || row.employeeName || ''
-                        }),
-                        h(ElementPlus.ElTableColumn, { 
-                          prop: 'remark', 
-                          label: '备注', 
-                          minWidth: 150,
-                          formatter: (row) => row.remark || ''
+            // 开卡明细对话框（仅开卡统计模块）
+            (m.key === 'cardSummary' ? h(ElementPlus.ElDialog, {
+              modelValue: this.cardDetailVisible,
+              'onUpdate:modelValue': (v) => this.cardDetailVisible = v,
+              title: `开卡明细 - ${this.currentCardDetailEmployee?.employeeName || ''}`,
+              width: '900px',
+              destroyOnClose: true
+            }, {
+              default: () => [
+                this.cardDetailList.length === 0
+                        ? h('div', { style: 'text-align: center; padding: 40px; color: #909399;' }, '暂无开卡记录')
+                        : h(ElementPlus.ElTable, {
+                          data: this.cardDetailList,
+                          stripe: true,
+                          border: true,
+                          style: 'width: 100%;'
+                        }, {
+                          default: () => [
+                            h(ElementPlus.ElTableColumn, {
+                              prop: 'memberName',
+                              label: '会员姓名',
+                              minWidth: 120,
+                              formatter: (row) => row.memberName || '未知'
+                            }),
+                            h(ElementPlus.ElTableColumn, {
+                              prop: 'memberPhone',
+                              label: '手机号',
+                              minWidth: 120,
+                              formatter: (row) => row.memberPhone || ''
+                            }),
+                            h(ElementPlus.ElTableColumn, {
+                              prop: 'cardTypeName',
+                              label: '卡种',
+                              minWidth: 120,
+                              formatter: (row) => row.cardTypeName || ''
+                            }),
+                            h(ElementPlus.ElTableColumn, {
+                              prop: 'amount',
+                              label: '金额',
+                              minWidth: 120,
+                              formatter: (row) => `¥${Number(row.amount || 0).toFixed(2)}`
+                            }),
+                            h(ElementPlus.ElTableColumn, {
+                              prop: 'transactionDate',
+                              label: '交易时间',
+                              minWidth: 120,
+                              formatter: (row) => row.transactionDate ? dayjs(row.transactionDate).format('YYYY-MM-DD') : ''
+                            }),
+                            h(ElementPlus.ElTableColumn, {
+                              prop: 'transactionType',
+                              label: '类型',
+                              minWidth: 100,
+                              formatter: (row) => {
+                                const type = row.transactionType || '';
+                                if (type === 'NEW') return h('span', { style: 'color: #67C23A; font-weight: bold;' }, '新开卡');
+                                if (type === 'RENEW') return h('span', { style: 'color: #409EFF; font-weight: bold;' }, '续费');
+                                return type;
+                              }
+                            })
+                          ]
                         })
-                      ]
-                    })
-              )
-            ],
-            footer: () => [
-              h(ElementPlus.ElButton, { onClick: () => this.renewHistoryVisible = false }, () => '关闭')
-            ]
-          }) : null)
-        ]);
-      }
-    });
+              ],
+              footer: () => [
+                h(ElementPlus.ElButton, { onClick: () => this.cardDetailVisible = false }, () => '关闭')
+              ]
+            }) : null),
 
-    // ----------------------------
-    // App
-    // ----------------------------
-    const App = defineComponent({
-      name: 'App',
-      setup() {
-        const activeKey = ref('members');
+            // 续卡对话框（仅会员管理模块）
+            (m.key === 'members' ? h(ElementPlus.ElDialog, {
+              modelValue: this.renewDialogVisible,
+              'onUpdate:modelValue': (v) => this.renewDialogVisible = v,
+              title: `续卡 - ${this.currentRenewMember?.name || ''}`,
+              width: '600px',
+              destroyOnClose: true
+            }, {
+              default: () => [
+                h(ElementPlus.ElForm, {
+                  model: this.renewForm,
+                  labelWidth: 120
+                }, () => [
+                  h(ElementPlus.ElFormItem, { label: '卡种', required: true }, () =>
+                          h(ElementPlus.ElSelect, {
+                            modelValue: this.renewForm.cardTypeId,
+                            'onUpdate:modelValue': (v) => this.renewForm.cardTypeId = v,
+                            filterable: true,
+                            clearable: true,
+                            placeholder: '请选择卡种',
+                            style: 'width: 100%;'
+                          }, () => {
+                            const cardTypesList = this.cardTypes || [];
+                            console.log('[续卡对话框] 卡种列表:', cardTypesList);
+                            return cardTypesList.filter(ct => ct && ct.status === 1).map(ct =>
+                                    h(ElementPlus.ElOption, { key: String(ct.id), label: `${ct.name} (¥${Number(ct.price || 0).toFixed(2)})`, value: ct.id })
+                            );
+                          })
+                  ),
+                  h(ElementPlus.ElFormItem, { label: '续卡日期', required: true }, () =>
+                          h(ElementPlus.ElDatePicker, {
+                            modelValue: this.renewForm.renewDate,
+                            'onUpdate:modelValue': (v) => this.renewForm.renewDate = v,
+                            type: 'date',
+                            format: 'YYYY-MM-DD',
+                            valueFormat: 'YYYY-MM-DD',
+                            placeholder: '选择续卡日期',
+                            style: 'width: 100%;'
+                          })
+                  ),
+                  h(ElementPlus.ElFormItem, { label: '操作员工' }, () =>
+                          h(ElementPlus.ElSelect, {
+                            modelValue: this.renewForm.employeeId,
+                            'onUpdate:modelValue': (v) => this.renewForm.employeeId = v,
+                            filterable: true,
+                            clearable: true,
+                            placeholder: '请选择员工',
+                            style: 'width: 100%;'
+                          }, () => {
+                            const employeesList = this.employeesList || [];
+                            console.log('[续卡对话框] 员工列表:', employeesList);
+                            return employeesList.filter(emp => emp && emp.status !== 0).map(emp =>
+                                    h(ElementPlus.ElOption, { key: String(emp.id), label: `${emp.name || ''} (${emp.username || ''})`, value: emp.id })
+                            );
+                          })
+                  ),
+                  h(ElementPlus.ElFormItem, { label: '备注' }, () =>
+                          h(ElementPlus.ElInput, {
+                            modelValue: this.renewForm.remark,
+                            'onUpdate:modelValue': (v) => this.renewForm.remark = v,
+                            type: 'textarea',
+                            rows: 3,
+                            placeholder: '请输入备注（可选）'
+                          })
+                  )
+                ])
+              ],
+              footer: () => [
+                h(ElementPlus.ElButton, { onClick: () => this.renewDialogVisible = false }, () => '取消'),
+                h(ElementPlus.ElButton, { type: 'primary', loading: this.renewLoading, onClick: this.submitRenew }, () => '确认续卡')
+              ]
+            }) : null),
 
-        // login state
-        const loginDialogVisible = ref(false);
-        const loginForm = reactive({ username: 'admin', password: 'admin123' });
-        const loginLoading = ref(false);
-        const currentUser = reactive({ 
-          name: '', 
-          username: '', 
-          role: '', 
-          employeeId: null,
-          memberCreate: false,
-          memberRead: false,
-          memberUpdate: false,
-          memberDelete: false
-        });
-        const authVersion = ref(0);
-        const cardTypes = ref([]);
-        const employees = ref([]);
-        
-        // 使用全局的tokenState（在组件外部定义），确保Vue能正确追踪
-        // 注意：tokenState是在全局作用域定义的，这里直接使用
-        
-        // 组件内部的token管理函数，同时更新全局tokenState
-        function setTokenInComponent(token) {
-          const tokenValue = token || '';
-          localStorage.setItem('token', tokenValue);
-          tokenState.value = tokenValue; // 更新全局响应式状态
+            // 续卡历史对话框（仅会员管理模块）
+            (m.key === 'members' ? h(ElementPlus.ElDialog, {
+              modelValue: this.renewHistoryVisible,
+              'onUpdate:modelValue': (v) => this.renewHistoryVisible = v,
+              title: `续卡历史 - ${this.currentRenewMember?.name || ''}`,
+              width: '900px',
+              destroyOnClose: true
+            }, {
+              default: () => [
+                this.renewHistoryLoading ? h(ElementPlus.ElSkeleton, { rows: 5, animated: true }) : (
+                        this.renewHistory.length === 0
+                                ? h('div', { style: 'text-align: center; padding: 40px; color: #909399;' }, '暂无续卡记录')
+                                : h(ElementPlus.ElTable, {
+                                  data: this.renewHistory,
+                                  stripe: true,
+                                  border: true,
+                                  style: 'width: 100%;'
+                                }, {
+                                  default: () => [
+                                    h(ElementPlus.ElTableColumn, {
+                                      prop: 'cardType',
+                                      label: '卡种',
+                                      minWidth: 120,
+                                      formatter: (row) => row.cardType?.name || row.cardTypeName || ''
+                                    }),
+                                    h(ElementPlus.ElTableColumn, {
+                                      prop: 'amount',
+                                      label: '金额',
+                                      minWidth: 120,
+                                      formatter: (row) => `¥${Number(row.amount || 0).toFixed(2)}`
+                                    }),
+                                    h(ElementPlus.ElTableColumn, {
+                                      prop: 'transactionDate',
+                                      label: '续卡日期',
+                                      minWidth: 120,
+                                      formatter: (row) => row.transactionDate || ''
+                                    }),
+                                    h(ElementPlus.ElTableColumn, {
+                                      prop: 'employee',
+                                      label: '操作员工',
+                                      minWidth: 120,
+                                      formatter: (row) => row.employee?.name || row.employeeName || ''
+                                    }),
+                                    h(ElementPlus.ElTableColumn, {
+                                      prop: 'remark',
+                                      label: '备注',
+                                      minWidth: 150,
+                                      formatter: (row) => row.remark || ''
+                                    })
+                                  ]
+                                })
+                )
+              ],
+              footer: () => [
+                h(ElementPlus.ElButton, { onClick: () => this.renewHistoryVisible = false }, () => '关闭')
+              ]
+            }) : null)
+          ]);
         }
-        function clearTokenInComponent() {
-          localStorage.removeItem('token');
-          tokenState.value = ''; // 更新全局响应式状态
-        }
+      });
 
-        async function loadCardTypes() {
-          const token = getToken();
-          if (!token) {
-            console.warn('[loadCardTypes] 没有token，跳过加载');
-            cardTypes.value = [];
-            return;
-          }
-          
-          try {
-            console.log('[loadCardTypes] 开始加载卡种，token:', token.substring(0, 20) + '...');
-            const res = await http.get('/api/card-types');
-            const body = res.data || {};
-            if (body.code === 200 && Array.isArray(body.data)) {
-              // 调试：打印返回的卡种列表
-              console.log('[loadCardTypes] 后端返回的卡种列表:', body.data);
-              const filtered = body.data.filter(x => x && x.status !== 0);
-              console.log('[loadCardTypes] 过滤后的卡种列表:', filtered);
-              cardTypes.value = filtered;
-            } else {
-              console.warn('[loadCardTypes] 响应格式异常:', body);
+      // ----------------------------
+      // App
+      // ----------------------------
+      const App = defineComponent({
+        name: 'App',
+        setup() {
+          const activeKey = ref('members');
+
+          // login state
+          const loginDialogVisible = ref(false);
+          const loginForm = reactive({ username: 'admin', password: 'admin123' });
+          const loginLoading = ref(false);
+          const currentUser = reactive({ name: '', username: '', role: '', employeeId: null });
+          const authVersion = ref(0);
+          const cardTypes = ref([]);
+          const employees = ref([]);
+
+          async function loadCardTypes() {
+            if (!getToken()) {
               cardTypes.value = [];
+              return;
             }
-          } catch (e) {
-            console.error('[loadCardTypes] 加载卡种失败:', e);
-            const status = e?.response?.status;
-            if (status === 401) {
-              console.warn('[loadCardTypes] 认证失败，可能需要重新登录');
-              // 401错误会被全局拦截器处理，这里只记录日志
-              // 清除token，触发重新登录
-              const currentToken = getToken();
-              if (currentToken) {
-                console.warn('[loadCardTypes] 清除无效token，准备重新登录');
-                clearTokenInComponent();
+            try {
+              const res = await http.get('/api/card-types');
+              const body = res.data || {};
+              if (body.code === 200 && Array.isArray(body.data)) {
+                // 调试：打印返回的卡种列表
+                console.log('[loadCardTypes] 后端返回的卡种列表:', body.data);
+                const filtered = body.data.filter(x => x && x.status !== 0);
+                console.log('[loadCardTypes] 过滤后的卡种列表:', filtered);
+                cardTypes.value = filtered;
               }
+            } catch (e) {
+              console.error('[loadCardTypes] 加载卡种失败:', e);
+              // ignore; UI can still work with raw id
             }
-            // 设置空数组，避免UI错误
+          }
+
+          async function loadEmployees() {
+            if (!getToken()) {
+              employees.value = [];
+              return;
+            }
+            try {
+              const res = await http.get('/api/employees');
+              const body = res.data || {};
+              console.log('[loadEmployees] 后端返回的员工列表:', body.data);
+              if (body.code === 200 && Array.isArray(body.data)) {
+                // 只加载启用的员工
+                const filtered = body.data.filter(x => x && x.status !== 0);
+                console.log('[loadEmployees] 过滤后的员工列表:', filtered);
+                employees.value = filtered;
+              }
+            } catch (e) {
+              console.error('[loadEmployees] 加载员工列表失败:', e);
+              // ignore; UI can still work with raw id
+            }
+          }
+
+          const modules = [
+            // MemberController -> 会员管理
+            {
+              key: 'members',
+              title: '会员管理',
+              icon: 'UserFilled',
+              list: { method: 'GET', url: '/api/members' },
+              // MemberController uses MemberRequest for create; include employeeId
+              create: {
+                url: '/api/members',
+                payload: (form, ctx) => ({
+                  name: form.name,
+                  gender: form.gender,
+                  phone: form.phone,
+                  idCard: form.idCard,
+                  cardTypeId: form.cardTypeId,
+                  startDate: form.startDate,
+                  remainingTimes: form.remainingTimes,
+                  employeeId: (form.employeeId !== '' && form.employeeId !== null && form.employeeId !== undefined)
+                          ? form.employeeId
+                          : (ctx?.currentEmployeeId ?? null)
+                })
+              },
+              delete: { url: (row) => '/api/members/' + row.id },
+              update: {
+                url: (row) => '/api/members/' + row.id,
+                payload: (form, row, ctx) => ({
+                  name: form.name,
+                  gender: form.gender,
+                  phone: form.phone,
+                  idCard: form.idCard,
+                  // MemberController update uses MemberRequest; backend only updates base info
+                })
+              },
+              listParams: [
+                { key: 'name', placeholder: '姓名' },
+                { key: 'phone', placeholder: '手机号' },
+                { key: 'isExpired', placeholder: '是否过期(0/1)' }
+              ],
+              columns: [
+                { key: 'id', label: 'ID', minWidth: 80 },
+                { key: 'name', label: '姓名' },
+                { key: 'gender', label: '性别' },
+                { key: 'phone', label: '手机号' },
+                { key: 'idCard', label: '身份证号', minWidth: 160 },
+                { key: 'cardTypeId', label: '卡种', minWidth: 140, value: (row) => row?.cardType?.name || row?.cardTypeName || row?.cardTypeId || '' },
+                { key: 'startDate', label: '开始日期', minWidth: 120 },
+                { key: 'expireDate', label: '到期日期', minWidth: 120 },
+                {
+                  key: 'expireWarning',
+                  label: '到期提醒',
+                  minWidth: 100,
+                  value: (row) => {
+                    if (!row?.expireDate) return '';
+                    const expireDate = dayjs(row.expireDate);
+                    const today = dayjs();
+                    const daysLeft = expireDate.diff(today, 'day');
+                    if (daysLeft < 0) return '已过期';
+                    if (daysLeft <= 7) return `${daysLeft}天后到期`;
+                    return '';
+                  }
+                },
+                { key: 'remainingTimes', label: '剩余次数', minWidth: 100 },
+                { key: 'isExpired', label: '过期(0/1)', minWidth: 100 },
+                {
+                  key: 'lastCheckinTime',
+                  label: '最近签到时间',
+                  minWidth: 160,
+                  value: (row) => {
+                    if (!row?.lastCheckinTime) return '未签到';
+                    return dayjs(row.lastCheckinTime).format('YYYY-MM-DD HH:mm:ss');
+                  }
+                },
+                {
+                  key: 'noCheckinOver7Days',
+                  label: '超过7天未签到',
+                  minWidth: 140,
+                  value: (row) => {
+                    if (row?.noCheckinOver7Days === 1) return '是';
+                    return '否';
+                  }
+                },
+                {
+                  key: 'firstEmployeeId',
+                  label: '首次开卡员工',
+                  minWidth: 140,
+                  value: (row, employees = []) => {
+                    if (!row?.firstEmployeeId) return '';
+                    // 尝试从关联对象获取
+                    if (row?.firstEmployee?.name) return row.firstEmployee.name;
+                    // 从员工列表中查找
+                    const emp = employees.find(e => e.id === row.firstEmployeeId);
+                    return emp ? (emp.name || emp.username || String(row.firstEmployeeId)) : String(row.firstEmployeeId);
+                  }
+                },
+                {
+                  key: 'lastEmployeeId',
+                  label: '最新续卡员工',
+                  minWidth: 140,
+                  value: (row, employees = []) => {
+                    if (!row?.lastEmployeeId) return '';
+                    // 尝试从关联对象获取
+                    if (row?.lastEmployee?.name) return row.lastEmployee.name;
+                    // 从员工列表中查找
+                    const emp = employees.find(e => e.id === row.lastEmployeeId);
+                    return emp ? (emp.name || emp.username || String(row.lastEmployeeId)) : String(row.lastEmployeeId);
+                  }
+                },
+                { key: 'status', label: '状态(1/0)', minWidth: 100 },
+                { key: 'createdAt', label: '创建时间', minWidth: 160 },
+                { key: 'updatedAt', label: '更新时间', minWidth: 160 }
+              ],
+              formFields: [
+                { key: 'name', label: '姓名' },
+                {
+                  key: 'gender',
+                  label: '性别',
+                  type: 'select',
+                  placeholder: '请选择性别',
+                  options: [
+                    { value: '男', label: '男' },
+                    { value: '女', label: '女' }
+                  ],
+                  default: '男'
+                },
+                { key: 'phone', label: '手机号' },
+                { key: 'idCard', label: '身份证号' },
+                {
+                  key: 'cardTypeId',
+                  label: '卡种',
+                  type: 'select',
+                  placeholder: '请选择卡种',
+                  options: ({ cardTypes }) => (cardTypes || []).map(ct => ({ value: ct.id, label: `${ct.name}（¥${ct.price}）` })),
+                  default: ({ cardTypes }) => (cardTypes && cardTypes[0] ? cardTypes[0].id : 1)
+                },
+                { key: 'startDate', label: '开始日期', type: 'date' },
+                { key: 'remainingTimes', label: '剩余次数(次卡)', type: 'number' },
+                {
+                  key: 'employeeId',
+                  label: '员工归属',
+                  type: 'select',
+                  placeholder: '请选择员工',
+                  options: ({ employees }) => {
+                    const empList = Array.isArray(employees) ? employees : [];
+                    console.log('[employeeId options] 员工列表:', empList);
+                    return empList.map(emp => ({ value: emp.id, label: `${emp.name || emp.username || '未知'} (${emp.username || ''})` }));
+                  },
+                  default: ({ currentEmployeeId }) => currentEmployeeId ?? null
+                }
+              ]
+            },
+
+            // CardTypeController -> 卡种管理
+            {
+              key: 'cardTypes',
+              title: '卡种管理',
+              icon: 'Tickets',
+              // 管理页显示全部（含禁用）
+              list: { method: 'GET', url: '/api/card-types/all' },
+              create: { url: '/api/card-types' },
+              delete: { url: (row) => '/api/card-types/' + row.id },
+              update: { url: (row) => '/api/card-types/' + row.id },
+              columns: [
+                { key: 'id', label: 'ID', minWidth: 80 },
+                { key: 'name', label: '卡种名称' },
+                { key: 'type', label: '类型(MONTH/QUARTER/YEAR/TIMES)', minWidth: 220 },
+                { key: 'duration', label: '时长/次数', minWidth: 120 },
+                { key: 'price', label: '价格', minWidth: 120 },
+                { key: 'status', label: '状态(1/0)', minWidth: 110 },
+                { key: 'createdAt', label: '创建时间', minWidth: 160 },
+                { key: 'updatedAt', label: '更新时间', minWidth: 160 }
+              ],
+              formFields: [
+                { key: 'name', label: '卡种名称' },
+                { key: 'type', label: '类型(MONTH/QUARTER/YEAR/TIMES)', default: 'MONTH' },
+                { key: 'duration', label: '时长/次数', type: 'number', default: 1 },
+                { key: 'price', label: '价格', default: '299.00' },
+                { key: 'status', label: '状态', type: 'switch', default: 1 }
+              ]
+            },
+
+            // EmployeeController -> 员工管理（管理员）
+            {
+              key: 'employees',
+              title: '员工管理',
+              icon: 'Avatar',
+              list: { method: 'GET', url: '/api/employees' },
+              create: { url: '/api/employees' },
+              delete: { url: (row) => '/api/employees/' + row.id },
+              update: { url: (row) => '/api/employees/' + row.id },
+              columns: [
+                { key: 'id', label: 'ID', minWidth: 80 },
+                { key: 'username', label: '用户名' },
+                // password intentionally NOT displayed (backend also nulls it)
+                { key: 'name', label: '姓名' },
+                { key: 'phone', label: '手机号' },
+                { key: 'role', label: '角色(ADMIN/STAFF)', minWidth: 160 },
+                { key: 'status', label: '状态(1/0)', minWidth: 110 },
+                { key: 'createdAt', label: '创建时间', minWidth: 160 },
+                { key: 'updatedAt', label: '更新时间', minWidth: 160 }
+              ],
+              formFields: [
+                { key: 'username', label: '用户名' },
+                { key: 'password', label: '密码' },
+                { key: 'name', label: '姓名' },
+                { key: 'phone', label: '手机号' },
+                { key: 'role', label: '角色(ADMIN/STAFF)', default: 'STAFF' },
+                { key: 'status', label: '状态', type: 'switch', default: 1 }
+              ]
+            },
+
+            // CommissionRuleController -> 提成规则（管理员）
+            {
+              key: 'commissionRules',
+              title: '提成规则',
+              icon: 'Coin',
+              list: { method: 'GET', url: '/api/commission-rules' },
+              create: { url: '/api/commission-rules' },
+              delete: { url: (row) => '/api/commission-rules/' + row.id },
+              update: { url: (row) => '/api/commission-rules/' + row.id },
+              columns: [
+                { key: 'id', label: 'ID', minWidth: 80 },
+                { key: 'cardTypeId', label: '卡种ID', minWidth: 100 },
+                { key: 'transactionType', label: '交易类型(NEW/RENEW)', minWidth: 180 },
+                { key: 'commissionRate', label: '提成比例(%)', minWidth: 130 },
+                { key: 'fixedAmount', label: '固定提成', minWidth: 120 },
+                { key: 'createdAt', label: '创建时间', minWidth: 160 },
+                { key: 'updatedAt', label: '更新时间', minWidth: 160 }
+              ],
+              formFields: [
+                { key: 'cardTypeId', label: '卡种ID', type: 'number', default: 1 },
+                { key: 'transactionType', label: '交易类型(NEW/RENEW)', default: 'NEW' },
+                { key: 'commissionRate', label: '提成比例(%)', default: '15.00' },
+                { key: 'fixedAmount', label: '固定提成(可空)', default: '' }
+              ]
+            },
+
+            // FinancialController -> 开卡统计（新接口）
+            {
+              key: 'cardSummary',
+              title: '开卡统计',
+              icon: 'CreditCard',
+              list: {
+                method: 'GET',
+                url: '/api/financial/card-summary',
+                params: (p) => ({ month: p.month || dayjs().format('YYYY-MM') })
+              },
+              listParams: [{ key: 'month', type: 'month', placeholder: '选择月份', default: dayjs().format('YYYY-MM') }],
+              columns: [
+                { key: 'employeeId', label: '员工ID', minWidth: 100 },
+                { key: 'employeeName', label: '员工姓名', minWidth: 140 },
+                { key: 'month', label: '月份', minWidth: 110 },
+                { key: 'cardCount', label: '开卡数量', minWidth: 120 },
+                { key: 'totalCardAmount', label: '开卡金额', minWidth: 120, value: (row) => row?.totalCardAmount ? `¥${Number(row.totalCardAmount).toFixed(2)}` : '¥0.00' },
+                { key: 'commissionAmount', label: '提成金额', minWidth: 120, value: (row) => {
+                    const amount = Number(row?.totalCardAmount || 0);
+                    const commission = amount * 0.02; // 2%提成
+                    return `¥${commission.toFixed(2)}`;
+                  }},
+                {
+                  key: 'cardMembers',
+                  label: '开卡明细',
+                  minWidth: 300,
+                  clickable: true, // 标记为可点击
+                  value: (row) => {
+                    if (!row?.cardMembers || !Array.isArray(row.cardMembers) || row.cardMembers.length === 0) {
+                      return '无';
+                    }
+                    const count = row.cardMembers.length;
+                    return `共${count}条记录（点击查看详情）`;
+                  }
+                }
+              ],
+              formFields: [], // read-only
+              // 自定义渲染，显示汇总信息
+              customRender: true
+            },
+
+            // FinancialController -> 交易明细（只读）
+            {
+              key: 'transactions',
+              title: '交易明细',
+              icon: 'Document',
+              list: {
+                method: 'GET',
+                url: '/api/financial/transactions',
+                params: (p) => {
+                  const params = {};
+                  if (p.employeeId) params.employeeId = p.employeeId;
+                  if (p.month) params.month = p.month;
+                  if (p.transactionType) params.transactionType = p.transactionType;
+                  return params;
+                }
+              },
+              listParams: [
+                { key: 'employeeId', placeholder: '员工ID(可选)', type: 'number' },
+                { key: 'month', type: 'month', placeholder: '月份(YYYY-MM，可选)' },
+                { key: 'transactionType', type: 'select', placeholder: '交易类型', options: [
+                    { label: '全部', value: '' },
+                    { label: '新会员办卡', value: 'NEW' },
+                    { label: '旧会员续卡', value: 'RENEW' }
+                  ]}
+              ],
+              columns: [
+                { key: 'id', label: 'ID', minWidth: 80 },
+                { key: 'member', label: '会员', minWidth: 140, value: (row) => {
+                    const member = row.member || {};
+                    return member.name ? `${member.name} (${member.phone || ''})` : (row.memberName || row.memberId || '');
+                  }},
+                { key: 'cardType', label: '卡种', minWidth: 120, value: (row) => row.cardType?.name || row.cardTypeName || row.cardTypeId || '' },
+                { key: 'transactionType', label: '交易类型', minWidth: 120, value: (row) => {
+                    const type = row.transactionType || '';
+                    if (type === 'NEW') return '新会员办卡';
+                    if (type === 'RENEW') return '旧会员续卡';
+                    return type;
+                  }},
+                { key: 'amount', label: '交易金额', minWidth: 120, value: (row) => `¥${Number(row.amount || 0).toFixed(2)}` },
+                { key: 'employee', label: '操作员工', minWidth: 120, value: (row) => row.employee?.name || row.employeeName || row.employeeId || '' },
+                { key: 'transactionDate', label: '交易日期', minWidth: 120 },
+                { key: 'remark', label: '备注', minWidth: 160 },
+                { key: 'createdAt', label: '创建时间', minWidth: 160, value: (row) => row.createdAt ? dayjs(row.createdAt).format('YYYY-MM-DD HH:mm:ss') : '' }
+              ],
+              formFields: [] // read-only
+            }
+          ];
+
+          const moduleMap = computed(() => {
+            const map = {};
+            modules.forEach(m => map[m.key] = m);
+            return map;
+          });
+          const activeModule = computed(() => {
+            const key = activeKey.value;
+            const module = moduleMap.value[key];
+            if (!module) {
+              console.warn(`[activeModule] 未找到模块 key="${key}", 使用默认模块`);
+              return modules[0];
+            }
+            console.log(`[activeModule] 当前模块: key="${key}", title="${module.title}", url="${module.list?.url}"`);
+            return module;
+          });
+
+          function openLogin() {
+            loginDialogVisible.value = true;
+          }
+
+          async function doLogin() {
+            loginLoading.value = true;
+            try {
+              const res = await http.post('/api/auth/login', {
+                username: loginForm.username,
+                password: loginForm.password
+              });
+              const body = res.data || {};
+              if (body.code !== 200) throw new Error(body.message || '登录失败');
+              const data = body.data || {};
+              setToken(data.token || '');
+              authVersion.value++;
+              currentUser.username = data.username || loginForm.username;
+              currentUser.name = data.name || '';
+              currentUser.role = data.role || '';
+              currentUser.employeeId = data.employeeId || null;
+              loginDialogVisible.value = false;
+              ElementPlus.ElMessage.success('登录成功');
+              await loadCardTypes();
+              await loadEmployees();
+            } catch (e) {
+              ElementPlus.ElMessage.error(e?.message || String(e));
+            } finally {
+              loginLoading.value = false;
+            }
+          }
+
+          async function doLogout() {
+            try {
+              await http.post('/api/auth/logout');
+            } catch { /* ignore */ }
+            clearToken();
+            authVersion.value++;
+            currentUser.username = '';
+            currentUser.name = '';
+            currentUser.role = '';
+            currentUser.employeeId = null;
+            ElementPlus.ElMessage.success('已退出');
             cardTypes.value = [];
           }
-        }
 
-        async function loadEmployees() {
-          const token = getToken();
-          if (!token) {
-            console.warn('[loadEmployees] 没有token，跳过加载');
-            employees.value = [];
-            return;
-          }
-          
-          try {
-            console.log('[loadEmployees] 开始加载员工列表，token:', token.substring(0, 20) + '...');
-            const res = await http.get('/api/employees');
-            const body = res.data || {};
-            console.log('[loadEmployees] 后端返回的员工列表:', body.data);
-            if (body.code === 200 && Array.isArray(body.data)) {
-              // 只加载启用的员工
-              const filtered = body.data.filter(x => x && x.status !== 0);
-              console.log('[loadEmployees] 过滤后的员工列表:', filtered);
-              employees.value = filtered;
+          const tokenPresent = computed(() => !!getToken());
+          const userLabel = computed(() => {
+            if (!tokenPresent.value) return '未登录';
+            const name = currentUser.name || currentUser.username || '已登录';
+            const role = currentUser.role ? ` (${currentUser.role})` : '';
+            return name + role;
+          });
+
+          // global 401 handler (basic)
+          http.interceptors.response.use(
+                  (r) => r,
+                  (err) => {
+                    const status = err?.response?.status;
+                    if (status === 401) {
+                      ElementPlus.ElMessage.warning('登录已过期，请重新登录');
+                      openLogin();
+                    } else if (status === 403) {
+                      ElementPlus.ElMessage.error('权限不足（需要管理员权限）');
+                    }
+                    return Promise.reject(err);
+                  }
+          );
+
+          onMounted(() => {
+            if (!getToken()) {
+              openLogin();
             } else {
-              console.warn('[loadEmployees] 响应格式异常:', body);
-              employees.value = [];
+              loadCardTypes();
             }
-          } catch (e) {
-            console.error('[loadEmployees] 加载员工列表失败:', e);
-            const status = e?.response?.status;
-            if (status === 401) {
-              console.warn('[loadEmployees] 认证失败，可能需要重新登录');
-              // 401错误会被全局拦截器处理，这里只记录日志
-              // 清除token，触发重新登录
-              const currentToken = getToken();
-              if (currentToken) {
-                console.warn('[loadEmployees] 清除无效token，准备重新登录');
-                clearTokenInComponent();
-              }
-            } else if (status === 403) {
-              console.warn('[loadEmployees] 权限不足，非管理员用户无法访问员工列表');
-              // 非管理员用户可能无法访问，这是正常的
-            }
-            // 设置空数组，避免UI错误
-            employees.value = [];
-          }
-        }
+          });
 
-        const modules = [
-          // MemberController -> 会员管理
-          {
-            key: 'members',
-            title: '会员管理',
-            icon: 'UserFilled',
-            list: { method: 'GET', url: '/api/members' },
-            // MemberController uses MemberRequest for create; include employeeId
-            create: {
-              url: '/api/members',
-              payload: (form, ctx) => ({
-                name: form.name,
-                gender: form.gender,
-                phone: form.phone,
-                idCard: form.idCard,
-                cardTypeId: form.cardTypeId,
-                startDate: form.startDate,
-                remainingTimes: form.remainingTimes,
-                employeeId: (form.employeeId !== '' && form.employeeId !== null && form.employeeId !== undefined)
-                  ? form.employeeId
-                  : (ctx?.currentEmployeeId ?? null)
-              })
-            },
-            delete: { url: (row) => '/api/members/' + row.id },
-            update: {
-              url: (row) => '/api/members/' + row.id,
-              payload: (form, row, ctx) => ({
-                name: form.name,
-                gender: form.gender,
-                phone: form.phone,
-                idCard: form.idCard,
-                // MemberController update uses MemberRequest; backend only updates base info
-              })
-            },
-            listParams: [
-              { key: 'name', placeholder: '姓名' },
-              { key: 'phone', placeholder: '手机号' },
-              { key: 'isExpired', placeholder: '是否过期(0/1)' }
-            ],
-            columns: [
-              { key: 'id', label: 'ID', minWidth: 80 },
-              { key: 'name', label: '姓名' },
-              { key: 'gender', label: '性别' },
-              { key: 'phone', label: '手机号' },
-              { key: 'idCard', label: '身份证号', minWidth: 160 },
-              { key: 'cardTypeId', label: '卡种', minWidth: 140, value: (row) => row?.cardType?.name || row?.cardTypeName || row?.cardTypeId || '' },
-              { key: 'startDate', label: '开始日期', minWidth: 120 },
-              { key: 'expireDate', label: '到期日期', minWidth: 120 },
-              { 
-                key: 'expireWarning', 
-                label: '到期提醒', 
-                minWidth: 100,
-                value: (row) => {
-                  if (!row?.expireDate) return '';
-                  const expireDate = dayjs(row.expireDate);
-                  const today = dayjs();
-                  const daysLeft = expireDate.diff(today, 'day');
-                  if (daysLeft < 0) return '已过期';
-                  if (daysLeft <= 7) return `${daysLeft}天后到期`;
-                  return '';
-                }
-              },
-              { key: 'remainingTimes', label: '剩余次数', minWidth: 100 },
-              { key: 'isExpired', label: '过期(0/1)', minWidth: 100 },
-              { 
-                key: 'lastCheckinTime', 
-                label: '最近签到时间', 
-                minWidth: 160,
-                value: (row) => {
-                  if (!row?.lastCheckinTime) return '未签到';
-                  return dayjs(row.lastCheckinTime).format('YYYY-MM-DD HH:mm:ss');
-                }
-              },
-              { 
-                key: 'noCheckinOver7Days', 
-                label: '超过7天未签到', 
-                minWidth: 140,
-                value: (row) => {
-                  if (row?.noCheckinOver7Days === 1) return '是';
-                  return '否';
-                }
-              },
-              { 
-                key: 'firstEmployeeId', 
-                label: '首次开卡员工', 
-                minWidth: 140,
-                value: (row, employees = []) => {
-                  if (!row?.firstEmployeeId) return '';
-                  // 尝试从关联对象获取
-                  if (row?.firstEmployee?.name) return row.firstEmployee.name;
-                  // 从员工列表中查找
-                  const emp = employees.find(e => e.id === row.firstEmployeeId);
-                  return emp ? (emp.name || emp.username || String(row.firstEmployeeId)) : String(row.firstEmployeeId);
-                }
-              },
-              { 
-                key: 'lastEmployeeId', 
-                label: '最新续卡员工', 
-                minWidth: 140,
-                value: (row, employees = []) => {
-                  if (!row?.lastEmployeeId) return '';
-                  // 尝试从关联对象获取
-                  if (row?.lastEmployee?.name) return row.lastEmployee.name;
-                  // 从员工列表中查找
-                  const emp = employees.find(e => e.id === row.lastEmployeeId);
-                  return emp ? (emp.name || emp.username || String(row.lastEmployeeId)) : String(row.lastEmployeeId);
-                }
-              },
-              { key: 'status', label: '状态(1/0)', minWidth: 100 },
-              { key: 'createdAt', label: '创建时间', minWidth: 160 },
-              { key: 'updatedAt', label: '更新时间', minWidth: 160 }
-            ],
-            formFields: [
-              { key: 'name', label: '姓名' },
-              {
-                key: 'gender',
-                label: '性别',
-                type: 'select',
-                placeholder: '请选择性别',
-                options: [
-                  { value: '男', label: '男' },
-                  { value: '女', label: '女' }
-                ],
-                default: '男'
-              },
-              { key: 'phone', label: '手机号' },
-              { key: 'idCard', label: '身份证号' },
-              {
-                key: 'cardTypeId',
-                label: '卡种',
-                type: 'select',
-                placeholder: '请选择卡种',
-                options: ({ cardTypes }) => (cardTypes || []).map(ct => ({ value: ct.id, label: `${ct.name}（¥${ct.price}）` })),
-                default: ({ cardTypes }) => (cardTypes && cardTypes[0] ? cardTypes[0].id : 1)
-              },
-              { key: 'startDate', label: '开始日期', type: 'date' },
-              { key: 'remainingTimes', label: '剩余次数(次卡)', type: 'number' },
-              {
-                key: 'employeeId',
-                label: '员工归属',
-                type: 'select',
-                placeholder: '请选择员工',
-                options: ({ employees }) => {
-                  const empList = Array.isArray(employees) ? employees : [];
-                  console.log('[employeeId options] 员工列表:', empList);
-                  return empList.map(emp => ({ value: emp.id, label: `${emp.name || emp.username || '未知'} (${emp.username || ''})` }));
+          return {
+            modules, activeKey, activeModule,
+            loginDialogVisible, loginForm, loginLoading,
+            tokenPresent, userLabel, authVersion,
+            currentUser,
+            cardTypes,
+            employees,
+            loadCardTypes,
+            loadEmployees,
+            openLogin, doLogin, doLogout
+          };
+        },
+        render() {
+          return h(ElementPlus.ElContainer, { class: 'layout' }, () => [
+            h(ElementPlus.ElAside, { width: '220px', class: 'aside' }, () => [
+              h('div', { class: 'brand' }, [
+                h('span', null, 'Gym Admin'),
+                h('small', null, '一体化后台')
+              ]),
+              h(ElementPlus.ElMenu, {
+                defaultActive: this.activeKey,
+                onSelect: (index) => {
+                  console.log(`[Menu] 选择菜单项: ${index}`);
+                  this.activeKey = index;
                 },
-                default: ({ currentEmployeeId }) => currentEmployeeId ?? null
-              }
-            ]
-          },
+                backgroundColor: 'transparent',
+                textColor: '#cbd5e1',
+                activeTextColor: '#ffffff'
+              }, () => this.modules.map(m =>
+                      h(ElementPlus.ElMenuItem, { index: m.key, key: m.key }, () => [
+                        (m.icon && window.ElementPlusIconsVue && window.ElementPlusIconsVue[m.icon])
+                                ? h(ElementPlus.ElIcon, { style: 'margin-right: 8px;' }, () => h(window.ElementPlusIconsVue[m.icon]))
+                                : null,
+                        h('span', null, m.title)
+                      ])
+              ))
+            ]),
 
-          // CardTypeController -> 卡种管理
-          {
-            key: 'cardTypes',
-            title: '卡种管理',
-            icon: 'Tickets',
-            // 管理页显示全部（含禁用）
-            list: { method: 'GET', url: '/api/card-types/all' },
-            create: { url: '/api/card-types' },
-            delete: { url: (row) => '/api/card-types/' + row.id },
-            update: { url: (row) => '/api/card-types/' + row.id },
-            columns: [
-              { key: 'id', label: 'ID', minWidth: 80 },
-              { key: 'name', label: '卡种名称' },
-              { key: 'type', label: '类型(MONTH/QUARTER/YEAR/TIMES)', minWidth: 220 },
-              { key: 'duration', label: '时长/次数', minWidth: 120 },
-              { key: 'price', label: '价格', minWidth: 120 },
-              { key: 'status', label: '状态(1/0)', minWidth: 110 },
-              { key: 'createdAt', label: '创建时间', minWidth: 160 },
-              { key: 'updatedAt', label: '更新时间', minWidth: 160 }
-            ],
-            formFields: [
-              { key: 'name', label: '卡种名称' },
-              { key: 'type', label: '类型(MONTH/QUARTER/YEAR/TIMES)', default: 'MONTH' },
-              { key: 'duration', label: '时长/次数', type: 'number', default: 1 },
-              { key: 'price', label: '价格', default: '299.00' },
-              { key: 'status', label: '状态', type: 'switch', default: 1 }
-            ]
-          },
+            h(ElementPlus.ElContainer, null, () => [
+              h(ElementPlus.ElHeader, { class: 'header' }, () => [
+                h('div', { style: 'display:flex; gap:10px; align-items:center;' }, [
+                  h('div', { style: 'font-weight:700;' }, this.activeModule.title),
+                  h('span', { class: 'muted' }, 'BaseURL: '),
+                  h('span', { class: 'mono muted' }, 'http://localhost:8080')
+                ]),
+                h('div', { style: 'display:flex; gap:10px; align-items:center;' }, [
+                  h(ElementPlus.ElTag, { type: this.tokenPresent ? 'success' : 'info' }, () => this.userLabel),
+                  !this.tokenPresent
+                          ? h(ElementPlus.ElButton, { type: 'primary', onClick: this.openLogin }, () => '登录')
+                          : h(ElementPlus.ElButton, { onClick: this.doLogout }, () => '退出')
+                ])
+              ]),
 
-          // EmployeeController -> 员工管理（管理员）
-          {
-            key: 'employees',
-            title: '员工管理',
-            icon: 'Avatar',
-            list
+              h(ElementPlus.ElMain, { class: 'content' }, () => [
+                h(CrudView, {
+                  module: this.activeModule,
+                  authVersion: this.authVersion,
+                  isAuthed: this.tokenPresent,
+                  currentEmployeeId: this.currentUser?.employeeId,
+                  cardTypes: Array.isArray(this.cardTypes) ? this.cardTypes : [],
+                  employees: Array.isArray(this.employees) ? this.employees : [],
+                  onRefreshCardTypes: this.loadCardTypes,
+                  onRefreshEmployees: this.loadEmployees
+                })
+              ])
+            ]),
+
+            h(ElementPlus.ElDialog, {
+              modelValue: this.loginDialogVisible,
+              'onUpdate:modelValue': (v) => this.loginDialogVisible = v,
+              title: '登录',
+              width: '480px',
+              closeOnClickModal: false,
+              closeOnPressEscape: false
+            }, {
+              default: () => [
+                h(ElementPlus.ElAlert, {
+                  type: 'info',
+                  showIcon: true,
+                  title: '提示',
+                  description: '系统接口需要 Authorization Bearer Token。请先登录获取 token。'
+                }),
+                h('div', { style: 'height: 12px;' }),
+                h(ElementPlus.ElForm, { model: this.loginForm, labelWidth: 90 }, () => [
+                  h(ElementPlus.ElFormItem, { label: '用户名' }, () =>
+                          h(ElementPlus.ElInput, {
+                            modelValue: this.loginForm.username,
+                            'onUpdate:modelValue': (v) => this.loginForm.username = v,
+                            clearable: true
+                          })
+                  ),
+                  h(ElementPlus.ElFormItem, { label: '密码' }, () =>
+                          h(ElementPlus.ElInput, {
+                            modelValue: this.loginForm.password,
+                            'onUpdate:modelValue': (v) => this.loginForm.password = v,
+                            type: 'password',
+                            showPassword: true
+                          })
+                  )
+                ])
+              ],
+              footer: () => [
+                h(ElementPlus.ElButton, { onClick: () => this.loginDialogVisible = false }, () => '稍后'),
+                h(ElementPlus.ElButton, { type: 'primary', loading: this.loginLoading, onClick: this.doLogin }, () => '登录')
+              ]
+            })
+          ]);
+        }
+      });
+
+      // 注意：不要在 <script> 内写出字面量 "</scr" + "ipt>"（即便在注释里也会提前结束脚本，导致白屏）
+      // icons CDN: https://unpkg.com/@element-plus/icons-vue
+
+      const app = createApp(App);
+      app.use(window.ElementPlus);
+      // register all icons
+      if (window.ElementPlusIconsVue) {
+        for (const [key, component] of Object.entries(window.ElementPlusIconsVue)) {
+          app.component(key, component);
+        }
+      }
+      app.mount('#app');
+    } catch (e) {
+      showBootError('前端启动失败（白屏兜底面板）', (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e));
+    }
+  })();
+</script>
+</body>
+</html>
