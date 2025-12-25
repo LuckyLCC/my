@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS employee (
     phone VARCHAR(20) COMMENT '手机号',
     role VARCHAR(20) NOT NULL DEFAULT 'STAFF' COMMENT '角色：ADMIN/STAFF',
     status TINYINT DEFAULT 1 COMMENT '状态：1-启用，0-禁用',
+    member_create TINYINT DEFAULT 1 COMMENT '会员创建权限：1-有权限，0-无权限',
+    member_read TINYINT DEFAULT 1 COMMENT '会员查看权限：1-有权限，0-无权限',
+    member_update TINYINT DEFAULT 1 COMMENT '会员更新权限：1-有权限，0-无权限',
+    member_delete TINYINT DEFAULT 0 COMMENT '会员删除权限：1-有权限，0-无权限',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_username (username),
@@ -31,6 +35,7 @@ CREATE TABLE IF NOT EXISTS user_session (
     INDEX idx_employee (employee_id),
     INDEX idx_token (token),
     INDEX idx_expires (expires_at),
+    UNIQUE KEY uk_employee (employee_id),  -- 确保每个员工只有一个活跃Session，避免死锁
     FOREIGN KEY (employee_id) REFERENCES employee(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户会话表';
 
@@ -76,8 +81,8 @@ CREATE TABLE IF NOT EXISTS commission_rule (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     card_type_id BIGINT NOT NULL COMMENT '卡种ID',
     transaction_type VARCHAR(20) NOT NULL COMMENT '交易类型：NEW-新开卡，RENEW-续费',
-    commission_rate DECIMAL(5,2) NOT NULL COMMENT '提成比例（%）',
-    fixed_amount DECIMAL(10,2) COMMENT '固定提成金额',
+    commission_rate DECIMAL(5,2) COMMENT '提成比例（%），固定金额时可为NULL',
+    fixed_amount DECIMAL(10,2) COMMENT '固定提成金额，比例提成时可为NULL',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_card_transaction (card_type_id, transaction_type),
@@ -121,8 +126,9 @@ CREATE TABLE IF NOT EXISTS member_checkin (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员签到表';
 
 -- Insert default admin user (password: admin123)
-INSERT INTO employee (username, password, name, role) VALUES 
-('admin', 'admin123', '系统管理员', 'ADMIN');
+-- ADMIN角色默认拥有所有权限，但为了明确性，显式设置权限字段
+INSERT INTO employee (username, password, name, role, member_create, member_read, member_update, member_delete) VALUES 
+('admin', 'admin123', '系统管理员', 'ADMIN', 1, 1, 1, 1);
 
 -- Insert sample card types
 INSERT INTO card_type (name, type, duration, price) VALUES 

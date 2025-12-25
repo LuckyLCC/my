@@ -1,8 +1,6 @@
 package com.gym.my.service;
 
-import com.gym.my.entity.CardType;
 import com.gym.my.entity.CommissionRule;
-import com.gym.my.mapper.CardTypeMapper;
 import com.gym.my.mapper.CommissionRuleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,7 +14,6 @@ import java.util.List;
 public class CommissionService {
     
     private final CommissionRuleMapper commissionRuleMapper;
-    private final CardTypeMapper cardTypeMapper;
     
     /**
      * 计算提成金额
@@ -50,11 +47,19 @@ public class CommissionService {
     }
     
     public CommissionRule createRule(CommissionRule rule) {
+        // 验证：至少需要fixedAmount或commissionRate之一
+        if (rule.getFixedAmount() == null && rule.getCommissionRate() == null) {
+            throw new RuntimeException("必须设置固定金额或提成比例之一");
+        }
         commissionRuleMapper.insert(rule);
         return rule;
     }
     
     public CommissionRule updateRule(CommissionRule rule) {
+        // 验证：至少需要fixedAmount或commissionRate之一
+        if (rule.getFixedAmount() == null && rule.getCommissionRate() == null) {
+            throw new RuntimeException("必须设置固定金额或提成比例之一");
+        }
         commissionRuleMapper.update(rule);
         return commissionRuleMapper.findById(rule.getId());
     }
