@@ -1474,30 +1474,6 @@
             ]
           },
 
-          // FinancialController -> 财务统计（只读，旧接口）
-          {
-            key: 'financialStats',
-            title: '财务统计（旧）',
-            icon: 'DataAnalysis',
-            list: {
-              method: 'GET',
-              url: '/api/financial/commission-stats',
-              params: (p) => ({ month: p.month || dayjs().format('YYYY-MM') })
-            },
-            listParams: [{ key: 'month', type: 'month', placeholder: '选择月份', default: dayjs().format('YYYY-MM') }],
-            columns: [
-              { key: 'employeeId', label: '员工ID', minWidth: 100 },
-              { key: 'employeeName', label: '员工姓名', minWidth: 140 },
-              { key: 'month', label: '月份', minWidth: 110 },
-              { key: 'totalCommission', label: '总提成', minWidth: 120 },
-              { key: 'newCardCount', label: '新开卡数量', minWidth: 120 },
-              { key: 'newCardCommission', label: '新开卡提成', minWidth: 120 },
-              { key: 'renewCount', label: '续费数量', minWidth: 120 },
-              { key: 'renewCommission', label: '续费提成', minWidth: 120 }
-            ],
-            formFields: [] // read-only
-          },
-
           // FinancialController -> 开卡统计（新接口）
           {
             key: 'cardSummary',
