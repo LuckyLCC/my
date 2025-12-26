@@ -10,11 +10,13 @@ import com.gym.my.service.MemberService;
 import com.gym.my.util.PermissionUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
@@ -27,13 +29,14 @@ public class MemberController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) Integer isExpired,
+            @RequestParam(required = false) Integer expireWithinDays,
             HttpServletRequest request) {
         try {
             Employee employee = PermissionUtil.getCurrentEmployee(request);
             if (!PermissionUtil.hasMemberReadPermission(employee)) {
                 return ApiResponse.error("权限不足：无会员查看权限");
             }
-            List<Member> members = memberService.getAllMembers(name, phone, isExpired);
+            List<Member> members = memberService.getAllMembers(name, phone, isExpired, expireWithinDays);
             return ApiResponse.success(members);
         } catch (Exception e) {
             return ApiResponse.error(e.getMessage());
@@ -102,10 +105,14 @@ public class MemberController {
     
     @PostMapping("/renew")
     public ApiResponse<Member> renewMember(@Validated @RequestBody RenewRequest request) {
+        log.info("收到续卡请求，会员ID: {}, 卡种ID: {}, 续卡日期: {}, 员工ID: {}", 
+            request.getMemberId(), request.getCardTypeId(), request.getRenewDate(), request.getEmployeeId());
         try {
             Member member = memberService.renewMember(request);
+            log.info("续卡成功，会员ID: {}", request.getMemberId());
             return ApiResponse.success("续费成功", member);
         } catch (Exception e) {
+            log.error("续卡失败，会员ID: {}, 错误: {}", request.getMemberId(), e.getMessage(), e);
             return ApiResponse.error(e.getMessage());
         }
     }

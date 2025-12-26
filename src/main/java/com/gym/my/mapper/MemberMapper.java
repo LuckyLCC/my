@@ -58,11 +58,17 @@ public interface MemberMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Member member);
     
-    @Update("UPDATE member SET name = #{name}, gender = #{gender}, phone = #{phone}, " +
-            "id_card = #{idCard}, card_type_id = #{cardTypeId}, start_date = #{startDate}, " +
-            "expire_date = #{expireDate}, pending_card_start_date = #{pendingCardStartDate}, " +
-            "pending_card_type_id = #{pendingCardTypeId}, pending_card_expire_date = #{pendingCardExpireDate}, " +
-            "remaining_times = #{remainingTimes}, is_expired = #{isExpired}, last_employee_id = #{lastEmployeeId} WHERE id = #{id}")
+    @Update("<script>" +
+            "UPDATE member SET name = #{name}, gender = #{gender}, phone = #{phone}, " +
+            "id_card = #{idCard}, " +
+            "<if test='cardTypeId != null'> card_type_id = #{cardTypeId}, </if>" +
+            "<if test='startDate != null'> start_date = #{startDate}, </if>" +
+            "<if test='expireDate != null'> expire_date = #{expireDate}, </if>" +
+            "pending_card_start_date = #{pendingCardStartDate}, " +
+            "pending_card_type_id = #{pendingCardTypeId}, " +
+            "pending_card_expire_date = #{pendingCardExpireDate}, " +
+            "remaining_times = #{remainingTimes}, is_expired = #{isExpired}, last_employee_id = #{lastEmployeeId} WHERE id = #{id}" +
+            "</script>")
     int update(Member member);
     
     @Update("UPDATE member SET status = 0 WHERE id = #{id}")
@@ -70,6 +76,37 @@ public interface MemberMapper {
     
     @Update("UPDATE member SET is_expired = 1 WHERE expire_date < CURDATE() AND is_expired = 0")
     int updateExpiredMembers();
+    
+    /**
+     * 查询所有需要激活的未生效卡种（pending_card_start_date <= 今天）
+     */
+    @Select("SELECT * FROM member WHERE pending_card_start_date IS NOT NULL " +
+            "AND pending_card_start_date <= CURDATE() AND status = 1")
+    @Results({
+        @Result(property = "cardType", column = "card_type_id",
+                one = @One(select = "com.gym.my.mapper.CardTypeMapper.findById"))
+    })
+    List<Member> findMembersWithPendingCardsToActivate();
+    
+    /**
+     * 激活未生效的卡种：将未生效卡种信息更新到当前卡种，并清空未生效卡种字段
+     */
+    @Update("UPDATE member SET " +
+            "card_type_id = #{pendingCardTypeId}, " +
+            "start_date = #{pendingCardStartDate}, " +
+            "expire_date = #{pendingCardExpireDate}, " +
+            "pending_card_start_date = NULL, " +
+            "pending_card_type_id = NULL, " +
+            "pending_card_expire_date = NULL, " +
+            "is_expired = CASE WHEN #{pendingCardExpireDate} < CURDATE() THEN 1 ELSE 0 END " +
+            "WHERE id = #{id}")
+    int activatePendingCard(Member member);
+    
+    /**
+     * 更新会员的剩余次数（用于次卡激活时）
+     */
+    @Update("UPDATE member SET remaining_times = #{remainingTimes} WHERE id = #{id}")
+    int updateRemainingTimes(@Param("id") Long id, @Param("remainingTimes") Integer remainingTimes);
     
     @Select("SELECT COUNT(*) FROM member WHERE phone = #{phone} AND status = 1")
     int countByPhone(String phone);

@@ -16,7 +16,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MemberService {
@@ -86,10 +89,17 @@ public class MemberService {
      */
     @Transactional
     public Member renewMember(RenewRequest request) {
+        log.info("开始执行续卡，会员ID: {}, 卡种ID: {}, 续卡日期: {}", 
+            request.getMemberId(), request.getCardTypeId(), request.getRenewDate());
+        
         Member member = memberMapper.findById(request.getMemberId());
         if (member == null) {
+            log.error("续卡失败：会员不存在，会员ID: {}", request.getMemberId());
             throw new RuntimeException("会员不存在");
         }
+        
+        log.info("找到会员，姓名: {}, 当前到期日期: {}, 未生效卡种开始日期: {}", 
+            member.getName(), member.getExpireDate(), member.getPendingCardStartDate());
         
         CardType cardType = cardTypeMapper.findById(request.getCardTypeId());
         if (cardType == null) {
@@ -147,14 +157,49 @@ public class MemberService {
         
         // 更新会员信息
         LocalDate today = LocalDate.now();
-        int isExpired = newExpireDate.isBefore(today) ? 1 : 0;
-        member.setCardTypeId(cardType.getId());
-        member.setStartDate(newStartDate); // 更新开始日期（场景一保持不变，场景二更新为续卡日期）
-        member.setExpireDate(newExpireDate); // 更新到期日期
-        member.setIsExpired(isExpired);
+        boolean isFutureRenewal = request.getRenewDate().isAfter(today);
+        log.info("续卡日期判断，续卡日期: {}, 今天: {}, 是否为未来续卡: {}", 
+            request.getRenewDate(), today, isFutureRenewal);
+        
+        // 判断是否是修改未生效卡种（之前已有未生效卡种，且新续卡日期也是未来日期）
+        boolean isModifyingPendingCard = isFutureRenewal && member.getPendingCardStartDate() != null;
+        LocalDate oldPendingCardStartDate = isModifyingPendingCard ? member.getPendingCardStartDate() : null; // 保存旧的未生效卡种开始日期，用于查找对应的交易记录
+        
+        if (isFutureRenewal) {
+            // 特殊情况：续卡日期是未来日期（未生效的续卡）
+            // 例如：顾客指定"下个月1号才开始生效"
+            // 保存到未生效卡种字段，不更新当前的开始日期和到期日期
+            // 注意：如果会员之前已有未生效卡种，这里会直接覆盖（支持改卡功能）
+            member.setPendingCardStartDate(request.getRenewDate()); // 未生效卡种开始日期（覆盖之前的）
+            member.setPendingCardTypeId(cardType.getId()); // 未生效卡种ID（覆盖之前的，支持从月卡改为季卡）
+            member.setPendingCardExpireDate(calculateExpireDate(request.getRenewDate(), cardType)); // 未生效卡种到期日期（覆盖之前的）
+            
+            // 保持当前的开始日期和到期日期不变
+            // member.setStartDate() 和 member.setExpireDate() 不需要更新
+            
+            // 过期状态判断：使用当前的到期日期
+            int isExpired = (member.getExpireDate() != null && member.getExpireDate().isBefore(today)) ? 1 : 0;
+            member.setIsExpired(isExpired);
+        } else {
+            // 正常情况：续卡日期不是未来日期，立即生效
+            // 更新当前的开始日期和到期日期
+            member.setCardTypeId(cardType.getId());
+            member.setStartDate(newStartDate); // 更新开始日期（场景一保持不变，场景二更新为续卡日期）
+            member.setExpireDate(newExpireDate); // 更新到期日期
+            
+            // 清空未生效卡种字段（如果之前有未生效卡种，现在立即生效了，所以清空）
+            member.setPendingCardStartDate(null);
+            member.setPendingCardTypeId(null);
+            member.setPendingCardExpireDate(null);
+            
+            int isExpired = newExpireDate.isBefore(today) ? 1 : 0;
+            member.setIsExpired(isExpired);
+        }
+        
         member.setLastEmployeeId(request.getEmployeeId());
         
-        if ("TIMES".equals(cardType.getType())) {
+        // 次卡：只在非未来续卡时增加次数（未来续卡时，等激活后再增加）
+        if ("TIMES".equals(cardType.getType()) && !isFutureRenewal) {
             // 次卡：增加次数
             int currentTimes = member.getRemainingTimes() != null ? member.getRemainingTimes() : 0;
             member.setRemainingTimes(currentTimes + cardType.getDuration());
@@ -162,25 +207,84 @@ public class MemberService {
         
         memberMapper.update(member);
         
-        // 创建交易记录
-        BigDecimal commissionAmount = commissionService.calculateCommission(
-                cardType.getId(), "RENEW", cardType.getPrice());
+        // 记录未生效卡种信息（用于调试）
+        if (isFutureRenewal) {
+            log.info("续卡后设置未生效卡种，会员ID: {}, 开始日期: {}, 卡种ID: {}, 到期日期: {}", 
+                member.getId(), member.getPendingCardStartDate(), member.getPendingCardTypeId(), member.getPendingCardExpireDate());
+        }
         
-        TransactionRecord record = new TransactionRecord();
-        record.setMemberId(member.getId());
-        record.setCardTypeId(cardType.getId());
-        record.setTransactionType("RENEW");
-        record.setAmount(cardType.getPrice());
-        record.setCommissionAmount(commissionAmount);
-        record.setEmployeeId(request.getEmployeeId());
-        record.setTransactionDate(LocalDateTime.now()); // 交易日期时间（当前时间精确到秒）
-        record.setStartDate(orderStartDate); // 该笔订单的实际开始日期
-        record.setExpireDate(orderExpireDate); // 该笔订单的实际到期日期
-        record.setRemark(request.getRemark());
+        if (isModifyingPendingCard) {
+            // 修改未生效卡种：更新之前对应的交易记录
+            // 查找之前未生效卡种对应的交易记录（通过startDate匹配）
+            TransactionRecord oldRecord = transactionRecordMapper.findByMemberIdAndStartDate(
+                    member.getId(), oldPendingCardStartDate);
+            
+            if (oldRecord != null) {
+                // 更新交易记录：卡种、金额、开始日期、到期日期
+                BigDecimal commissionAmount = commissionService.calculateCommission(
+                        cardType.getId(), "RENEW", cardType.getPrice());
+                
+                oldRecord.setCardTypeId(cardType.getId());
+                oldRecord.setAmount(cardType.getPrice());
+                oldRecord.setCommissionAmount(commissionAmount);
+                oldRecord.setStartDate(orderStartDate); // 新的开始日期
+                oldRecord.setExpireDate(orderExpireDate); // 新的到期日期
+                if (request.getRemark() != null && !request.getRemark().isEmpty()) {
+                    oldRecord.setRemark(request.getRemark());
+                }
+                
+                transactionRecordMapper.update(oldRecord);
+                log.info("已更新未生效卡种对应的交易记录，会员ID: {}, 旧开始日期: {}, 新卡种ID: {}", 
+                    member.getId(), oldPendingCardStartDate, cardType.getId());
+            } else {
+                // 如果没有找到对应的交易记录，创建新的交易记录（兼容旧数据）
+                log.warn("未找到未生效卡种对应的交易记录，会员ID: {}, 开始日期: {}，将创建新记录", 
+                    member.getId(), oldPendingCardStartDate);
+                BigDecimal commissionAmount = commissionService.calculateCommission(
+                        cardType.getId(), "RENEW", cardType.getPrice());
+                
+                TransactionRecord record = new TransactionRecord();
+                record.setMemberId(member.getId());
+                record.setCardTypeId(cardType.getId());
+                record.setTransactionType("RENEW");
+                record.setAmount(cardType.getPrice());
+                record.setCommissionAmount(commissionAmount);
+                record.setEmployeeId(request.getEmployeeId());
+                record.setTransactionDate(LocalDateTime.now());
+                record.setStartDate(orderStartDate);
+                record.setExpireDate(orderExpireDate);
+                record.setRemark(request.getRemark());
+                
+                transactionRecordMapper.insert(record);
+            }
+        } else {
+            // 创建新的交易记录
+            BigDecimal commissionAmount = commissionService.calculateCommission(
+                    cardType.getId(), "RENEW", cardType.getPrice());
+            
+            TransactionRecord record = new TransactionRecord();
+            record.setMemberId(member.getId());
+            record.setCardTypeId(cardType.getId());
+            record.setTransactionType("RENEW");
+            record.setAmount(cardType.getPrice());
+            record.setCommissionAmount(commissionAmount);
+            record.setEmployeeId(request.getEmployeeId());
+            record.setTransactionDate(LocalDateTime.now()); // 交易日期时间（当前时间精确到秒）
+            record.setStartDate(orderStartDate); // 该笔订单的实际开始日期
+            record.setExpireDate(orderExpireDate); // 该笔订单的实际到期日期
+            record.setRemark(request.getRemark());
+            
+            transactionRecordMapper.insert(record);
+        }
         
-        transactionRecordMapper.insert(record);
-        
-        return memberMapper.findById(member.getId());
+        // 重新查询会员信息，确保返回最新的未生效卡种信息
+        Member updatedMember = memberMapper.findById(member.getId());
+        if (updatedMember != null && isFutureRenewal) {
+            log.info("续卡后查询会员信息，会员ID: {}, 未生效卡种开始日期: {}, 卡种ID: {}, 到期日期: {}", 
+                updatedMember.getId(), updatedMember.getPendingCardStartDate(), 
+                updatedMember.getPendingCardTypeId(), updatedMember.getPendingCardExpireDate());
+        }
+        return updatedMember;
     }
     
     /**
@@ -221,14 +325,30 @@ public class MemberService {
         }
     }
     
-    public List<Member> getAllMembers(String name, String phone, Integer isExpired) {
+    public List<Member> getAllMembers(String name, String phone, Integer isExpired, Integer expireWithinDays) {
         // 如果查询涉及过期状态筛选，先更新过期会员状态（确保数据一致性）
         // 这样可以确保筛选结果准确，即使定时任务还没运行
-        if (isExpired != null) {
+        if (isExpired != null || expireWithinDays != null) {
             memberMapper.updateExpiredMembers();
         }
         // 然后查询
-        return memberMapper.findAll(name, phone, isExpired);
+        List<Member> members = memberMapper.findAll(name, phone, isExpired);
+        
+        // 如果指定了"X天内到期"筛选，进一步过滤
+        if (expireWithinDays != null) {
+            LocalDate today = LocalDate.now();
+            LocalDate targetDate = today.plusDays(expireWithinDays);
+            members = members.stream()
+                    .filter(m -> {
+                        if (m.getExpireDate() == null) return false;
+                        LocalDate expireDate = m.getExpireDate();
+                        // 筛选：到期日期在今天和targetDate之间（包括今天和targetDate）
+                        return !expireDate.isBefore(today) && !expireDate.isAfter(targetDate);
+                    })
+                    .collect(Collectors.toList());
+        }
+        
+        return members;
     }
     
     public Member getMember(Long id) {
@@ -270,5 +390,48 @@ public class MemberService {
     public List<TransactionRecord> getRenewHistory(Long memberId) {
         // 返回该会员的所有交易记录（NEW和RENEW），按时间倒序排列
         return transactionRecordMapper.findByMemberId(memberId);
+    }
+    
+    /**
+     * 激活未生效的卡种（定时任务调用）
+     * 检查所有未生效卡种的开始日期，如果 <= 今天，则激活该卡种
+     */
+    @Transactional
+    public void activatePendingCards() {
+        List<Member> membersToActivate = memberMapper.findMembersWithPendingCardsToActivate();
+        
+        for (Member member : membersToActivate) {
+            if (member.getPendingCardStartDate() != null 
+                && member.getPendingCardTypeId() != null 
+                && member.getPendingCardExpireDate() != null) {
+                
+                // 如果是次卡，需要在激活前计算需要增加的次数
+                CardType pendingCardType = cardTypeMapper.findById(member.getPendingCardTypeId());
+                Integer newRemainingTimes = null;
+                
+                if (pendingCardType != null && "TIMES".equals(pendingCardType.getType())) {
+                    // 次卡：需要增加次数
+                    int currentTimes = member.getRemainingTimes() != null ? member.getRemainingTimes() : 0;
+                    newRemainingTimes = currentTimes + pendingCardType.getDuration();
+                }
+                
+                // 激活未生效的卡种
+                memberMapper.activatePendingCard(member);
+                
+                // 如果是次卡，更新剩余次数
+                if (newRemainingTimes != null) {
+                    memberMapper.updateRemainingTimes(member.getId(), newRemainingTimes);
+                }
+                
+                log.info("会员 {} (ID: {}) 的未生效卡种已激活，开始日期: {}, 到期日期: {}", 
+                    member.getName(), member.getId(), 
+                    member.getPendingCardStartDate(), 
+                    member.getPendingCardExpireDate());
+            }
+        }
+        
+        if (!membersToActivate.isEmpty()) {
+            log.info("共激活 {} 个未生效的卡种", membersToActivate.size());
+        }
     }
 }

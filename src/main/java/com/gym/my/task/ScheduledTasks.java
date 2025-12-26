@@ -30,6 +30,20 @@ public class ScheduledTasks {
     }
     
     /**
+     * 每天凌晨1点检查并激活未生效卡种
+     */
+    @Scheduled(cron = "0 0 1 * * ?")
+    public void activatePendingCards() {
+        log.info("开始执行定时任务：激活未生效卡种");
+        try {
+            memberService.activatePendingCards();
+            log.info("定时任务执行成功：激活未生效卡种");
+        } catch (Exception e) {
+            log.error("定时任务执行失败：激活未生效卡种", e);
+        }
+    }
+    
+    /**
      * 每小时清理过期的Session
      */
     @Scheduled(cron = "0 0 * * * ?")

@@ -62,6 +62,9 @@ CREATE TABLE IF NOT EXISTS member (
     start_date DATE NOT NULL COMMENT '开始日期（会员当前有效权益的开始日期，卡在有效期内续卡时保持不变，卡已过期重新办卡时更新为续卡日期）',
     first_card_date DATE COMMENT '首次开卡日期（永远不变，记录会员首次办卡日期）',
     expire_date DATE NOT NULL COMMENT '到期日期（当前卡的到期日期）',
+    pending_card_start_date DATE COMMENT '未生效卡种开始日期（未来生效的续卡日期）',
+    pending_card_type_id BIGINT COMMENT '未生效卡种ID',
+    pending_card_expire_date DATE COMMENT '未生效卡种到期日期（从开始日期+卡种时长计算得出）',
     remaining_times INT COMMENT '剩余次数（次卡使用）',
     is_expired TINYINT DEFAULT 0 COMMENT '是否过期：1-是，0-否',
     first_employee_id BIGINT COMMENT '首次开卡员工ID',
@@ -72,7 +75,9 @@ CREATE TABLE IF NOT EXISTS member (
     INDEX idx_phone (phone),
     INDEX idx_expire_date (expire_date),
     INDEX idx_is_expired (is_expired),
+    INDEX idx_pending_card_start_date (pending_card_start_date),
     FOREIGN KEY (card_type_id) REFERENCES card_type(id),
+    FOREIGN KEY (pending_card_type_id) REFERENCES card_type(id),
     FOREIGN KEY (first_employee_id) REFERENCES employee(id),
     FOREIGN KEY (last_employee_id) REFERENCES employee(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员表';

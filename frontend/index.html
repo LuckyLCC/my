@@ -308,7 +308,15 @@
             // init list params
             Object.keys(listParams).forEach(k => delete listParams[k]);
             (props.module.listParams || []).forEach(p => {
-              listParams[p.key] = p.default !== undefined ? p.default : '';
+              if (p.default !== undefined) {
+                listParams[p.key] = p.default;
+              } else if (p.type === 'select') {
+                // select类型默认值：如果第一个选项的value是null，使用null，否则使用空字符串
+                const firstOption = p.options && p.options[0];
+                listParams[p.key] = firstOption && firstOption.value === null ? null : '';
+              } else {
+                listParams[p.key] = '';
+              }
             });
           }
 
@@ -524,19 +532,33 @@
           async function openRenew(row) {
             currentRenewMember.value = row;
             renewForm.memberId = row.id;
-            renewForm.cardTypeId = row.cardTypeId || null;
+            
+            // 智能设置卡种默认值：
+            // - 如果会员有未生效卡种，默认选择未生效卡种（方便修改）
+            // - 否则，默认选择当前卡种
+            if (row.pendingCardTypeId) {
+              renewForm.cardTypeId = row.pendingCardTypeId;
+            } else {
+              renewForm.cardTypeId = row.cardTypeId || null;
+            }
             
             // 智能设置续卡日期默认值：
+            // - 如果会员有未生效卡种，默认使用未生效卡种的开始日期（方便修改日期）
             // - 如果当前卡未过期（到期日期 >= 今天）：续卡日期 = 当前到期日期 + 1天（新卡开始生效的日期）
             // - 如果当前卡已过期（到期日期 < 今天）：续卡日期 = 今天（中断续卡，从今天开始）
             const today = dayjs();
-            const expireDate = row.expireDate ? dayjs(row.expireDate) : null;
-            if (expireDate && (expireDate.isAfter(today) || expireDate.isSame(today, 'day'))) {
-              // 卡在有效期内续卡：续卡日期默认 = 当前到期日期 + 1天（员工看到这个日期就知道是新卡开始生效的日期）
-              renewForm.renewDate = expireDate.clone().add(1, 'day').format('YYYY-MM-DD');
+            if (row.pendingCardStartDate) {
+              // 有未生效卡种：默认使用未生效卡种的开始日期（方便修改）
+              renewForm.renewDate = row.pendingCardStartDate;
             } else {
-              // 卡已过期续卡：续卡日期默认 = 今天（中断续卡，从今天开始）
-              renewForm.renewDate = today.format('YYYY-MM-DD');
+              const expireDate = row.expireDate ? dayjs(row.expireDate) : null;
+              if (expireDate && (expireDate.isAfter(today) || expireDate.isSame(today, 'day'))) {
+                // 卡在有效期内续卡：续卡日期默认 = 当前到期日期 + 1天（员工看到这个日期就知道是新卡开始生效的日期）
+                renewForm.renewDate = expireDate.clone().add(1, 'day').format('YYYY-MM-DD');
+              } else {
+                // 卡已过期续卡：续卡日期默认 = 今天（中断续卡，从今天开始）
+                renewForm.renewDate = today.format('YYYY-MM-DD');
+              }
             }
             
             renewForm.employeeId = props.currentEmployeeId || null;
@@ -839,6 +861,19 @@
                       style: 'width: 160px;'
                     });
                   }
+                  if (p.type === 'select') {
+                    const opts = p.options || [];
+                    return h(ElementPlus.ElSelect, {
+                      key: p.key,
+                      modelValue: this.listParams[p.key],
+                      'onUpdate:modelValue': (v) => this.listParams[p.key] = v,
+                      placeholder: p.placeholder || ('筛选 ' + p.key),
+                      clearable: true,
+                      style: 'width: 160px;'
+                    }, () => opts.map(opt => 
+                      h(ElementPlus.ElOption, { key: opt.value, label: opt.label, value: opt.value })
+                    ));
+                  }
                   return h(ElementPlus.ElInput, {
                     key: p.key,
                     modelValue: this.listParams[p.key],
@@ -908,6 +943,11 @@
                         const employeesList = Array.isArray(this.employees) ? this.employees : [];
                         return col.value(row, employeesList);
                       }
+                      // 如果是未生效卡种列，传递卡种列表给value函数
+                      if (col.key === 'pendingCardStartDate') {
+                        const cardTypesList = Array.isArray(this.cardTypes) ? this.cardTypes : [];
+                        return col.value(row, cardTypesList);
+                      }
                       // 如果是到期提醒列，需要特殊处理样式
                       if (col.key === 'expireWarning') {
                         const warningText = col.value(row);
@@ -945,6 +985,12 @@
                       return col.value(row);
                     }
                     if (col.key === 'status') {
+                      // 特殊处理：判断是否有未生效卡种（显示"待生效"标签）
+                      if (row.pendingCardStartDate) {
+                        // 有未生效卡种，显示"待生效"标签（黄色）
+                        return h(ElementPlus.ElTag, { type: 'warning' }, () => '待生效');
+                      }
+                      // 正常状态：显示启用/禁用
                       const enabled = (cellValue === 1 || cellValue === '1');
                       return enabled ? '启用' : '禁用';
                     }
@@ -1254,6 +1300,13 @@
                                       prop: 'transactionDate',
                                       label: '交易日期',
                                       minWidth: 160,
+                                      sortable: true,
+                                      sortMethod: (a, b) => {
+                                        // 自定义排序方法：按交易日期时间戳排序
+                                        const dateA = a.transactionDate ? new Date(a.transactionDate).getTime() : 0;
+                                        const dateB = b.transactionDate ? new Date(b.transactionDate).getTime() : 0;
+                                        return dateA - dateB;
+                                      },
                                       formatter: (row) => {
                                         if (!row.transactionDate) return '';
                                         // 如果是日期时间格式，直接格式化；如果是日期格式，添加时间部分
@@ -1429,7 +1482,27 @@
               listParams: [
                 { key: 'name', placeholder: '姓名' },
                 { key: 'phone', placeholder: '手机号' },
-                { key: 'isExpired', placeholder: '是否过期(0/1)' }
+                { 
+                  key: 'isExpired', 
+                  type: 'select',
+                  placeholder: '是否过期',
+                  options: [
+                    { label: '全部', value: null },
+                    { label: '未过期', value: 0 },
+                    { label: '已过期', value: 1 }
+                  ]
+                },
+                {
+                  key: 'expireWithinDays',
+                  type: 'select',
+                  placeholder: '到期提醒',
+                  options: [
+                    { label: '全部', value: null },
+                    { label: '7天内到期', value: 7 },
+                    { label: '15天内到期', value: 15 },
+                    { label: '30天内到期', value: 30 }
+                  ]
+                }
               ],
               columns: [
                 { key: 'id', label: 'ID', minWidth: 80 },
@@ -1440,6 +1513,26 @@
                 { key: 'cardTypeId', label: '卡种', minWidth: 140, value: (row) => row?.cardType?.name || row?.cardTypeName || row?.cardTypeId || '' },
                 { key: 'startDate', label: '开始日期', minWidth: 120 },
                 { key: 'expireDate', label: '到期日期', minWidth: 120 },
+                {
+                  key: 'pendingCardStartDate',
+                  label: '未生效卡种',
+                  minWidth: 200,
+                  value: (row, cardTypes = []) => {
+                    if (!row?.pendingCardStartDate) return '-';
+                    // 查找未生效卡种信息
+                    const pendingCardTypeId = row?.pendingCardTypeId;
+                    const pendingCardType = cardTypes.find(ct => ct.id === pendingCardTypeId);
+                    const cardTypeName = pendingCardType?.name || (pendingCardTypeId ? `卡种ID: ${pendingCardTypeId}` : '未知卡种');
+                    const startDate = row.pendingCardStartDate;
+                    const expireDate = row?.pendingCardExpireDate || '';
+                    // 显示格式：卡种名称 + 开始日期至到期日期
+                    if (expireDate) {
+                      return `${cardTypeName} ${startDate} 至 ${expireDate}`;
+                    } else {
+                      return `${cardTypeName} ${startDate}`;
+                    }
+                  }
+                },
                 {
                   key: 'expireWarning',
                   label: '到期提醒',

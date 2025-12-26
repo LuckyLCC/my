@@ -4,6 +4,7 @@ import com.gym.my.dto.CommissionStats;
 import com.gym.my.entity.TransactionRecord;
 import org.apache.ibatis.annotations.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Mapper
@@ -199,4 +200,28 @@ public interface TransactionRecordMapper {
                 one = @One(select = "com.gym.my.mapper.EmployeeMapper.findById"))
     })
     List<TransactionRecord> findByMemberId(@Param("memberId") Long memberId);
+    
+    /**
+     * 根据会员ID和开始日期查找交易记录（用于查找未生效卡种对应的交易记录）
+     */
+    @Select("SELECT tr.* FROM transaction_record tr " +
+            "WHERE tr.member_id = #{memberId} " +
+            "AND tr.transaction_type = 'RENEW' " +
+            "AND tr.start_date = #{startDate} " +
+            "ORDER BY tr.transaction_date DESC, tr.created_at DESC " +
+            "LIMIT 1")
+    TransactionRecord findByMemberIdAndStartDate(@Param("memberId") Long memberId, @Param("startDate") LocalDate startDate);
+    
+    /**
+     * 更新交易记录（用于修改未生效卡种时更新对应的交易记录）
+     */
+    @Update("UPDATE transaction_record SET " +
+            "card_type_id = #{cardTypeId}, " +
+            "amount = #{amount}, " +
+            "commission_amount = #{commissionAmount}, " +
+            "start_date = #{startDate}, " +
+            "expire_date = #{expireDate}, " +
+            "remark = #{remark} " +
+            "WHERE id = #{id}")
+    int update(TransactionRecord record);
 }
