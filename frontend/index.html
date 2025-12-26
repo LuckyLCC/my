@@ -111,7 +111,7 @@
       if (!window.ElementPlus) throw new Error('Element Plus 未加载（window.ElementPlus 不存在）');
       if (!window.axios) throw new Error('Axios 未加载（window.axios 不存在）');
 
-      const { createApp, ref, reactive, computed, watch, onMounted, defineComponent, h } = window.Vue;
+      const { createApp, ref, reactive, computed, watch, onMounted, defineComponent, h, nextTick } = window.Vue;
 
       // ----------------------------
       // Axios global config
@@ -121,21 +121,41 @@
         withCredentials: true
       });
 
-      function getToken() {
+      // 注意：这些函数在 App setup 之前定义，所以不能直接访问 tokenRef
+      // 我们会在 App setup 中创建包装函数
+      function getTokenBase() {
         return localStorage.getItem('token') || '';
       }
-      function setToken(token) {
+      function setTokenBase(token) {
         localStorage.setItem('token', token || '');
       }
-      function clearToken() {
+      function clearTokenBase() {
         localStorage.removeItem('token');
       }
+      
+      // 全局函数（在 App setup 之前使用，只能读取 localStorage）
+      function getToken() {
+        return getTokenBase();
+      }
+      function setToken(token) {
+        setTokenBase(token);
+      }
+      function clearToken() {
+        clearTokenBase();
+      }
+      
+      // 创建一个全局变量来存储tokenRef的更新函数（供响应拦截器使用）
+      let tokenRefUpdater = null;
 
       http.interceptors.request.use((config) => {
-        const token = getToken();
+        const token = getTokenBase(); // 直接从 localStorage 读取
         if (token) {
           config.headers = config.headers || {};
           config.headers['Authorization'] = 'Bearer ' + token;
+        }
+        // 记录请求日志（仅开发环境）
+        if (config.url && !config.url.includes('unpkg.com')) {
+          console.log(`[HTTP Request] ${config.method?.toUpperCase()} ${config.url}`, token ? '(with token)' : '(no token)');
         }
         return config;
       });
@@ -184,6 +204,7 @@
           authVersion: { type: Number, required: true },
           isAuthed: { type: Boolean, required: true },
           currentEmployeeId: { type: [Number, String, null], required: false, default: null },
+          currentUser: { type: Object, required: false, default: () => ({}) },
           cardTypes: { type: Array, required: false, default: () => [] },
           employees: { type: Array, required: false, default: () => [] },
           onRefreshCardTypes: { type: Function, required: false, default: null },
@@ -231,8 +252,29 @@
           const listParams = reactive({});
 
           const canCreate = computed(() => !!props.module.create);
-          const canDelete = computed(() => !!props.module.delete);
-          const canUpdate = computed(() => !!props.module.update);
+          // 对于会员管理模块，根据用户权限决定是否可以编辑和删除
+          const canDelete = computed(() => {
+            if (!props.module.delete) return false;
+            // 如果是会员管理模块，需要检查用户权限
+            if (props.module.key === 'members') {
+              // ADMIN 拥有所有权限
+              if (props.currentUser?.role === 'ADMIN') return true;
+              // 普通员工需要 memberDelete 权限
+              return props.currentUser?.memberDelete === true;
+            }
+            return true;
+          });
+          const canUpdate = computed(() => {
+            if (!props.module.update) return false;
+            // 如果是会员管理模块，需要检查用户权限
+            if (props.module.key === 'members') {
+              // ADMIN 拥有所有权限
+              if (props.currentUser?.role === 'ADMIN') return true;
+              // 普通员工需要 memberUpdate 权限
+              return props.currentUser?.memberUpdate === true;
+            }
+            return true;
+          });
           const isReadOnly = computed(() => !canCreate.value && !canDelete.value);
 
           function initForms() {
@@ -271,7 +313,9 @@
           }
 
           async function loadList() {
-            if (!props.isAuthed) {
+            // 检查 token 是否存在（直接检查 localStorage，更可靠）
+            const hasToken = localStorage.getItem('token');
+            if (!hasToken && !props.isAuthed) {
               rows.value = [];
               errorText.value = '未登录：请先登录后再加载数据';
               return;
@@ -481,7 +525,20 @@
             currentRenewMember.value = row;
             renewForm.memberId = row.id;
             renewForm.cardTypeId = row.cardTypeId || null;
-            renewForm.renewDate = dayjs().format('YYYY-MM-DD');
+            
+            // 智能设置续卡日期默认值：
+            // - 如果当前卡未过期（到期日期 >= 今天）：续卡日期 = 当前到期日期 + 1天（新卡开始生效的日期）
+            // - 如果当前卡已过期（到期日期 < 今天）：续卡日期 = 今天（中断续卡，从今天开始）
+            const today = dayjs();
+            const expireDate = row.expireDate ? dayjs(row.expireDate) : null;
+            if (expireDate && (expireDate.isAfter(today) || expireDate.isSame(today, 'day'))) {
+              // 卡在有效期内续卡：续卡日期默认 = 当前到期日期 + 1天（员工看到这个日期就知道是新卡开始生效的日期）
+              renewForm.renewDate = expireDate.clone().add(1, 'day').format('YYYY-MM-DD');
+            } else {
+              // 卡已过期续卡：续卡日期默认 = 今天（中断续卡，从今天开始）
+              renewForm.renewDate = today.format('YYYY-MM-DD');
+            }
+            
             renewForm.employeeId = props.currentEmployeeId || null;
             renewForm.remark = '';
             // 打开对话框前重新加载卡种列表，确保显示最新的启用状态
@@ -594,12 +651,14 @@
 
             // status switch (1/0)
             if (field.type === 'switch' || modelKey === 'status') {
+              // 权限字段使用不同的文本
+              const isPermissionField = modelKey.startsWith('member');
               return h(ElementPlus.ElFormItem, { label, prop: modelKey }, () =>
                       h(ElementPlus.ElSwitch, {
                         modelValue: target[modelKey] === 1 || target[modelKey] === '1' || target[modelKey] === true,
                         'onUpdate:modelValue': (v) => target[modelKey] = v ? 1 : 0,
-                        activeText: '启用',
-                        inactiveText: '禁用'
+                        activeText: isPermissionField ? '有权限' : '启用',
+                        inactiveText: isPermissionField ? '无权限' : '禁用'
                       })
               );
             }
@@ -680,13 +739,56 @@
             // 清空旧数据，避免显示错误的数据
             rows.value = [];
             initForms();
-            await loadList();
+            // 检查 token 是否存在（直接检查 localStorage，确保检查的是最新值）
+            const hasToken = localStorage.getItem('token');
+            if (hasToken && props.isAuthed) {
+              await loadList();
+            } else if (!hasToken) {
+              errorText.value = '未登录：请先登录后再加载数据';
+            }
           }, { immediate: true });
+
+          // 监听 isAuthed 变化，当从 false 变为 true 时自动加载数据
+          watch(() => props.isAuthed, async (newValue, oldValue) => {
+            console.log(`[CrudView] isAuthed 变化: ${oldValue} -> ${newValue}`);
+            if (newValue && !oldValue) {
+              // 从未登录变为已登录，自动加载数据
+              const hasToken = localStorage.getItem('token');
+              if (hasToken) {
+                console.log('[CrudView] 检测到登录状态变化，自动加载数据');
+                await loadList();
+              }
+            } else if (!newValue && oldValue) {
+              // 从已登录变为未登录，清空数据
+              rows.value = [];
+              errorText.value = '未登录：请先登录后再加载数据';
+            }
+          });
 
           watch(() => props.authVersion, async () => {
             // login/logout 后自动刷新当前模块
             initForms();
-            await loadList();
+            // 检查 token 是否存在（直接检查 localStorage，确保检查的是最新值）
+            const hasToken = localStorage.getItem('token');
+            
+            if (hasToken) {
+              // token 存在，尝试加载数据
+              // 如果 isAuthed 还没更新，等待一下
+              if (!props.isAuthed) {
+                console.log('[CrudView] token 存在但 isAuthed 未更新，等待后重试...');
+                await new Promise(resolve => setTimeout(resolve, 300));
+              }
+              
+              // 再次检查，如果 token 仍然存在就加载数据（不依赖 isAuthed）
+              if (localStorage.getItem('token')) {
+                console.log('[CrudView] authVersion 变化，加载数据');
+                await loadList();
+              }
+            } else {
+              // 没有 token，清空数据
+              rows.value = [];
+              errorText.value = '未登录：请先登录后再加载数据';
+            }
           });
 
           return {
@@ -1150,9 +1252,28 @@
                                     }),
                                     h(ElementPlus.ElTableColumn, {
                                       prop: 'transactionDate',
-                                      label: '续卡日期',
+                                      label: '交易日期',
+                                      minWidth: 160,
+                                      formatter: (row) => {
+                                        if (!row.transactionDate) return '';
+                                        // 如果是日期时间格式，直接格式化；如果是日期格式，添加时间部分
+                                        if (row.transactionDate.includes('T') || row.transactionDate.includes(' ')) {
+                                          return dayjs(row.transactionDate).format('YYYY-MM-DD HH:mm:ss');
+                                        }
+                                        return dayjs(row.transactionDate).format('YYYY-MM-DD HH:mm:ss');
+                                      }
+                                    }),
+                                    h(ElementPlus.ElTableColumn, {
+                                      prop: 'startDate',
+                                      label: '开始日期',
                                       minWidth: 120,
-                                      formatter: (row) => row.transactionDate || ''
+                                      formatter: (row) => row.startDate || ''
+                                    }),
+                                    h(ElementPlus.ElTableColumn, {
+                                      prop: 'expireDate',
+                                      label: '到期日期',
+                                      minWidth: 120,
+                                      formatter: (row) => row.expireDate || ''
                                     }),
                                     h(ElementPlus.ElTableColumn, {
                                       prop: 'employee',
@@ -1190,10 +1311,45 @@
           const loginDialogVisible = ref(false);
           const loginForm = reactive({ username: 'admin', password: 'admin123' });
           const loginLoading = ref(false);
-          const currentUser = reactive({ name: '', username: '', role: '', employeeId: null });
+          const currentUser = reactive({ 
+            name: '', 
+            username: '', 
+            role: '', 
+            employeeId: null,
+            memberCreate: false,
+            memberRead: false,
+            memberUpdate: false,
+            memberDelete: false
+          });
           const authVersion = ref(0);
           const cardTypes = ref([]);
           const employees = ref([]);
+          
+          // 使用响应式变量追踪 token 状态（这样 computed 才能正确更新）
+          const tokenRef = ref(getTokenBase() || '');
+          
+          // 设置全局tokenRef更新函数，供响应拦截器使用
+          tokenRefUpdater = (newToken) => {
+            tokenRef.value = newToken;
+            console.log('[tokenRefUpdater] tokenRef已更新');
+          };
+          
+          // 先定义包装函数，这样 loadCardTypes/loadEmployees 等函数可以使用
+          function setToken(token) {
+            const tokenValue = token || '';
+            setTokenBase(tokenValue); // 保存到 localStorage
+            tokenRef.value = tokenValue; // 更新响应式变量，触发 computed 更新
+            console.log('[setToken] token 已更新，tokenRef.value =', tokenRef.value ? '有值' : '空');
+          }
+          function clearToken() {
+            clearTokenBase(); // 清除 localStorage
+            tokenRef.value = ''; // 更新响应式变量，触发 computed 更新
+            console.log('[clearToken] token 已清除');
+          }
+          function getToken() {
+            // 优先使用响应式变量，如果为空则从 localStorage 读取（兼容性）
+            return tokenRef.value || getTokenBase();
+          }
 
           async function loadCardTypes() {
             if (!getToken()) {
@@ -1226,10 +1382,9 @@
               const body = res.data || {};
               console.log('[loadEmployees] 后端返回的员工列表:', body.data);
               if (body.code === 200 && Array.isArray(body.data)) {
-                // 只加载启用的员工
-                const filtered = body.data.filter(x => x && x.status !== 0);
-                console.log('[loadEmployees] 过滤后的员工列表:', filtered);
-                employees.value = filtered;
+                // 加载所有员工（包括禁用的），用于员工管理页面显示
+                console.log('[loadEmployees] 后端返回的员工列表:', body.data);
+                employees.value = body.data;
               }
             } catch (e) {
               console.error('[loadEmployees] 加载员工列表失败:', e);
@@ -1345,7 +1500,32 @@
                     return emp ? (emp.name || emp.username || String(row.lastEmployeeId)) : String(row.lastEmployeeId);
                   }
                 },
-                { key: 'status', label: '状态(1/0)', minWidth: 100 },
+                {
+                  key: 'status',
+                  label: '状态',
+                  minWidth: 120,
+                  value: (row) => {
+                    // 判断是否是待生效状态：开始日期是未来的日期
+                    if (row.startDate) {
+                      const startDate = dayjs(row.startDate);
+                      const today = dayjs();
+                      if (startDate.isAfter(today)) {
+                        // 开始日期是未来日期，显示"待生效"（黄色标签）
+                        return 'pending'; // 特殊标识，用于渲染时显示标签
+                      }
+                    }
+                    // 正常状态：显示启用/禁用
+                    return row.status === 1 ? '启用' : '禁用';
+                  },
+                  render: (h, row, col) => {
+                    // 自定义渲染：如果是待生效状态，显示黄色标签
+                    if (col.value === 'pending') {
+                      return h(ElementPlus.ElTag, { type: 'warning' }, () => '待生效');
+                    }
+                    // 正常状态：显示启用/禁用
+                    return col.value || '';
+                  }
+                },
                 { key: 'createdAt', label: '创建时间', minWidth: 160 },
                 { key: 'updatedAt', label: '更新时间', minWidth: 160 }
               ],
@@ -1382,7 +1562,8 @@
                   options: ({ employees }) => {
                     const empList = Array.isArray(employees) ? employees : [];
                     console.log('[employeeId options] 员工列表:', empList);
-                    return empList.map(emp => ({ value: emp.id, label: `${emp.name || emp.username || '未知'} (${emp.username || ''})` }));
+                    // 只显示启用的员工
+                    return empList.filter(emp => emp && emp.status !== 0).map(emp => ({ value: emp.id, label: `${emp.name || emp.username || '未知'} (${emp.username || ''})` }));
                   },
                   default: ({ currentEmployeeId }) => currentEmployeeId ?? null
                 }
@@ -1435,6 +1616,10 @@
                 { key: 'phone', label: '手机号' },
                 { key: 'role', label: '角色(ADMIN/STAFF)', minWidth: 160 },
                 { key: 'status', label: '状态(1/0)', minWidth: 110 },
+                { key: 'memberCreate', label: '创建权限', minWidth: 100, value: (row) => (row.memberCreate === 1 || row.memberCreate === true) ? '有' : '无' },
+                { key: 'memberRead', label: '查看权限', minWidth: 100, value: (row) => (row.memberRead === 1 || row.memberRead === true) ? '有' : '无' },
+                { key: 'memberUpdate', label: '更新权限', minWidth: 100, value: (row) => (row.memberUpdate === 1 || row.memberUpdate === true) ? '有' : '无' },
+                { key: 'memberDelete', label: '删除权限', minWidth: 100, value: (row) => (row.memberDelete === 1 || row.memberDelete === true) ? '有' : '无' },
                 { key: 'createdAt', label: '创建时间', minWidth: 160 },
                 { key: 'updatedAt', label: '更新时间', minWidth: 160 }
               ],
@@ -1444,35 +1629,14 @@
                 { key: 'name', label: '姓名' },
                 { key: 'phone', label: '手机号' },
                 { key: 'role', label: '角色(ADMIN/STAFF)', default: 'STAFF' },
-                { key: 'status', label: '状态', type: 'switch', default: 1 }
+                { key: 'status', label: '状态', type: 'switch', default: 1 },
+                { key: 'memberCreate', label: '会员创建权限', type: 'switch', default: 1 },
+                { key: 'memberRead', label: '会员查看权限', type: 'switch', default: 1 },
+                { key: 'memberUpdate', label: '会员更新权限', type: 'switch', default: 0 },
+                { key: 'memberDelete', label: '会员删除权限', type: 'switch', default: 0 }
               ]
             },
 
-            // CommissionRuleController -> 提成规则（管理员）
-            {
-              key: 'commissionRules',
-              title: '提成规则',
-              icon: 'Coin',
-              list: { method: 'GET', url: '/api/commission-rules' },
-              create: { url: '/api/commission-rules' },
-              delete: { url: (row) => '/api/commission-rules/' + row.id },
-              update: { url: (row) => '/api/commission-rules/' + row.id },
-              columns: [
-                { key: 'id', label: 'ID', minWidth: 80 },
-                { key: 'cardTypeId', label: '卡种ID', minWidth: 100 },
-                { key: 'transactionType', label: '交易类型(NEW/RENEW)', minWidth: 180 },
-                { key: 'commissionRate', label: '提成比例(%)', minWidth: 130 },
-                { key: 'fixedAmount', label: '固定提成', minWidth: 120 },
-                { key: 'createdAt', label: '创建时间', minWidth: 160 },
-                { key: 'updatedAt', label: '更新时间', minWidth: 160 }
-              ],
-              formFields: [
-                { key: 'cardTypeId', label: '卡种ID', type: 'number', default: 1 },
-                { key: 'transactionType', label: '交易类型(NEW/RENEW)', default: 'NEW' },
-                { key: 'commissionRate', label: '提成比例(%)', default: '15.00' },
-                { key: 'fixedAmount', label: '固定提成(可空)', default: '' }
-              ]
-            },
 
             // FinancialController -> 开卡统计（新接口）
             {
@@ -1594,15 +1758,34 @@
               if (body.code !== 200) throw new Error(body.message || '登录失败');
               const data = body.data || {};
               setToken(data.token || '');
-              authVersion.value++;
               currentUser.username = data.username || loginForm.username;
               currentUser.name = data.name || '';
               currentUser.role = data.role || '';
               currentUser.employeeId = data.employeeId || null;
+              // 保存权限信息
+              currentUser.memberCreate = data.memberCreate === true || data.memberCreate === 1;
+              currentUser.memberRead = data.memberRead === true || data.memberRead === 1;
+              currentUser.memberUpdate = data.memberUpdate === true || data.memberUpdate === 1;
+              currentUser.memberDelete = data.memberDelete === true || data.memberDelete === 1;
               loginDialogVisible.value = false;
               ElementPlus.ElMessage.success('登录成功');
+              
+              // 先加载基础数据
               await loadCardTypes();
               await loadEmployees();
+              
+              // tokenPresent 应该立即更新（因为 tokenRef 是响应式的）
+              await nextTick(); // 等待一个 tick 确保 computed 更新
+              
+              // 确保 tokenPresent 已更新后再增加 authVersion
+              if (tokenPresent.value) {
+                console.log('[doLogin] tokenPresent 已更新，触发数据加载');
+                authVersion.value++;
+              } else {
+                console.warn('[doLogin] tokenPresent 更新超时，但仍尝试触发数据加载');
+                // 即使超时也触发，让 watch 中的逻辑处理
+                authVersion.value++;
+              }
             } catch (e) {
               ElementPlus.ElMessage.error(e?.message || String(e));
             } finally {
@@ -1620,11 +1803,18 @@
             currentUser.name = '';
             currentUser.role = '';
             currentUser.employeeId = null;
+            currentUser.memberCreate = false;
+            currentUser.memberRead = false;
+            currentUser.memberUpdate = false;
+            currentUser.memberDelete = false;
             ElementPlus.ElMessage.success('已退出');
             cardTypes.value = [];
           }
 
-          const tokenPresent = computed(() => !!getToken());
+          // 确保 tokenRef 与 localStorage 同步（初始化时）
+          console.log('[App setup] 初始化 tokenRef =', tokenRef.value ? '有值' : '空');
+          
+          const tokenPresent = computed(() => !!tokenRef.value);
           const userLabel = computed(() => {
             if (!tokenPresent.value) return '未登录';
             const name = currentUser.name || currentUser.username || '已登录';
@@ -1632,25 +1822,86 @@
             return name + role;
           });
 
-          // global 401 handler (basic)
+          // global response handler
           http.interceptors.response.use(
-                  (r) => r,
+                  (response) => {
+                    // 检查响应头中的新Token（优先）
+                    const newTokenFromHeader = response.headers['x-new-token'];
+                    if (newTokenFromHeader) {
+                      console.log('[Token刷新] 从响应头获取新Token');
+                      setTokenBase(newTokenFromHeader);
+                      // 通过全局更新函数更新tokenRef（如果已设置）
+                      if (tokenRefUpdater) {
+                        tokenRefUpdater(newTokenFromHeader);
+                      }
+                    }
+                    
+                    // 检查响应体中的新Token
+                    const data = response.data;
+                    if (data && data.code === 200 && data.data) {
+                      const responseData = data.data;
+                      // 如果响应体包含token字段且tokenRefreshed为true，更新Token
+                      if (responseData.token && responseData.tokenRefreshed) {
+                        console.log('[Token刷新] 从响应体获取新Token');
+                        setTokenBase(responseData.token);
+                        // 通过全局更新函数更新tokenRef（如果已设置）
+                        if (tokenRefUpdater) {
+                          tokenRefUpdater(responseData.token);
+                        }
+                      }
+                    }
+                    
+                    return response;
+                  },
                   (err) => {
                     const status = err?.response?.status;
-                    if (status === 401) {
+                    const url = err?.config?.url || '';
+                    
+                    // 记录错误日志
+                    if (status === 404) {
+                      console.warn(`[HTTP 404] ${url} - 资源未找到，可能是静态资源或API路径错误`);
+                    } else if (status === 401) {
+                      console.warn(`[HTTP 401] ${url} - 未登录或登录已过期`);
                       ElementPlus.ElMessage.warning('登录已过期，请重新登录');
                       openLogin();
                     } else if (status === 403) {
+                      console.warn(`[HTTP 403] ${url} - 权限不足`);
                       ElementPlus.ElMessage.error('权限不足（需要管理员权限）');
+                    } else {
+                      console.error(`[HTTP Error] ${status} ${url}`, err);
                     }
                     return Promise.reject(err);
                   }
           );
 
+          // 获取当前用户信息（包括权限）
+          async function loadCurrentUser() {
+            if (!getToken()) return;
+            try {
+              const res = await http.get('/api/auth/me');
+              const body = res.data || {};
+              if (body.code === 200 && body.data) {
+                const data = body.data;
+                currentUser.username = data.username || '';
+                currentUser.name = data.name || '';
+                currentUser.role = data.role || '';
+                currentUser.employeeId = data.employeeId || null;
+                // 更新权限信息
+                currentUser.memberCreate = data.memberCreate === true || data.memberCreate === 1;
+                currentUser.memberRead = data.memberRead === true || data.memberRead === 1;
+                currentUser.memberUpdate = data.memberUpdate === true || data.memberUpdate === 1;
+                currentUser.memberDelete = data.memberDelete === true || data.memberDelete === 1;
+              }
+            } catch (e) {
+              console.error('[loadCurrentUser] 获取用户信息失败:', e);
+            }
+          }
+
           onMounted(() => {
             if (!getToken()) {
               openLogin();
             } else {
+              loadCurrentUser();
               loadCardTypes();
             }
           });
@@ -1664,6 +1915,7 @@
             employees,
             loadCardTypes,
             loadEmployees,
+            loadCurrentUser,
             openLogin, doLogin, doLogout
           };
         },
@@ -1714,6 +1966,7 @@
                   authVersion: this.authVersion,
                   isAuthed: this.tokenPresent,
                   currentEmployeeId: this.currentUser?.employeeId,
+                  currentUser: this.currentUser,
                   cardTypes: Array.isArray(this.cardTypes) ? this.cardTypes : [],
                   employees: Array.isArray(this.employees) ? this.employees : [],
                   onRefreshCardTypes: this.loadCardTypes,

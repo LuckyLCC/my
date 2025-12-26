@@ -2,17 +2,17 @@
   "status": "commited",
   "type": "frontend",
   "scope": "codebase",
-  "localEndpoint": "http://localhost:5173",
-  "loginUser": "admin",
-  "loginPassword": "admin123",
+  "localEndpoint": "http://localhost:5173/index.html",
+  "loginUser": "liuchang1",
+  "loginPassword": "12345",
   "executionArgs": {
-    "projectName": "my",
-    "projectPath": "/Users/liuchang/Documents/my",
+    "projectName": "my2",
+    "projectPath": "/Users/liuchang/Documents/my2",
     "testIds": [],
-    "additionalInstruction": "",
+    "additionalInstruction": "请测试所有功能，特别关注：\n1. 权限管理功能：验证普通员工（staff01）在会员管理页面是否正确隐藏了编辑和删除按钮\n2. Token刷新机制：验证Token自动刷新是否正常工作\n3. 员工创建时的权限设置功能",
     "envs": {
       "API_KEY": "sk-user-4itACkojPkp-Q6G_Ew1Q4r5si-69IdI6QQwgpvcm5fLNNPmQNCqC_jL6bqHNn7tvU-XF2zUdOr6drExv1DapD2l-wse-MAZWbnqwRYKuJASILm3v4s4Xz_W8Nbdb-NeBRmQ"
     }
   },
-  "proxy": "http://b8ba44ec-e92a-4243-b9b1-6363c1ee5b3b:Y461SQoTygM4ziVMMRIsQMIY66r4Tkje@tun.testsprite.com:8080"
+  "proxy": "http://7f4ce543-3948-47fa-981f-b183c00a60d7:f0sGqjGRMhL4HG45W5yqoBU6oWuYaCOa@tun.testsprite.com:8080"
 }

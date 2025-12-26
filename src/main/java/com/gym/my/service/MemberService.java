@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -49,7 +50,8 @@ public class MemberService {
         member.setPhone(request.getPhone());
         member.setIdCard(request.getIdCard());
         member.setCardTypeId(request.getCardTypeId());
-        member.setStartDate(request.getStartDate());
+        member.setStartDate(request.getStartDate()); // 开始日期（首次开卡日期）
+        member.setFirstCardDate(request.getStartDate()); // 首次开卡日期（与startDate保持一致）
         member.setExpireDate(expireDate);
         member.setRemainingTimes(request.getRemainingTimes());
         member.setIsExpired(isExpired);
@@ -70,7 +72,9 @@ public class MemberService {
         record.setAmount(cardType.getPrice());
         record.setCommissionAmount(commissionAmount);
         record.setEmployeeId(request.getEmployeeId());
-        record.setTransactionDate(request.getStartDate());
+        record.setTransactionDate(LocalDateTime.now()); // 交易日期时间（当前时间精确到秒）
+        record.setStartDate(request.getStartDate()); // 卡开始日期
+        record.setExpireDate(expireDate); // 卡到期日期
         
         transactionRecordMapper.insert(record);
         
@@ -92,17 +96,61 @@ public class MemberService {
             throw new RuntimeException("卡种不存在");
         }
         
-        // 计算新的到期日期（从原到期日或当前日期开始）
-        LocalDate baseDate = member.getExpireDate().isAfter(request.getRenewDate()) 
-                ? member.getExpireDate() 
-                : request.getRenewDate();
-        LocalDate newExpireDate = calculateExpireDate(baseDate, cardType);
+        // 总有效期显示策略：列表页展示会员当前的"有效权益周期"
+        LocalDate currentExpireDate = member.getExpireDate();
+        LocalDate currentStartDate = member.getStartDate();
+        LocalDate newStartDate;
+        LocalDate newExpireDate;
+        
+        // 交易记录中该笔订单的实际时间范围
+        LocalDate orderStartDate;
+        LocalDate orderExpireDate;
+        
+        // 续卡日期表示"新卡开始生效的日期"
+        // 判断逻辑：
+        // - 如果续卡日期 > 当前到期日期+1天，说明是中断续卡（卡已过期后重新办卡）
+        // - 如果续卡日期 <= 当前到期日期+1天（包括续卡日期 = 当前到期日期+1天），说明是提前续卡（顺延逻辑）
+        if (currentExpireDate != null && request.getRenewDate().isAfter(currentExpireDate.plusDays(1))) {
+            // 场景二：卡已过期，重新办卡（重置逻辑）
+            // 续卡日期 > 当前到期日期+1天，说明是中断续卡
+            // 开始日期 = 续卡日期，到期日期 = 续卡日期 + 新购时长
+            newStartDate = request.getRenewDate();
+            newExpireDate = calculateExpireDate(newStartDate, cardType);
+            
+            // 交易记录：保存该笔订单的实际时间范围
+            orderStartDate = newStartDate;
+            orderExpireDate = newExpireDate;
+        } else {
+            // 场景一：卡在有效期内续卡（顺延逻辑）
+            // 续卡日期 <= 当前到期日期+1天（包括续卡日期 = 当前到期日期+1天，这是正常的提前续卡）
+            // 开始日期保持不变，到期日期 = 原到期日期 + 新购时长
+            newStartDate = currentStartDate; // 保持不变
+            
+            // 从原到期日期开始加新购时长
+            if (currentExpireDate != null) {
+                newExpireDate = addDurationToDate(currentExpireDate, cardType);
+            } else {
+                // 如果没有当前到期日期（理论上不应该发生），从续卡日期开始计算
+                newStartDate = request.getRenewDate();
+                newExpireDate = calculateExpireDate(newStartDate, cardType);
+            }
+            
+            // 交易记录：该笔订单从续卡日期开始生效（续卡日期就是新卡开始生效的日期）
+            if (currentExpireDate != null) {
+                orderStartDate = request.getRenewDate(); // 订单开始日期 = 续卡日期（新卡开始生效的日期）
+                orderExpireDate = calculateExpireDate(orderStartDate, cardType); // 订单到期日期
+            } else {
+                orderStartDate = request.getRenewDate();
+                orderExpireDate = newExpireDate;
+            }
+        }
         
         // 更新会员信息
         LocalDate today = LocalDate.now();
         int isExpired = newExpireDate.isBefore(today) ? 1 : 0;
         member.setCardTypeId(cardType.getId());
-        member.setExpireDate(newExpireDate);
+        member.setStartDate(newStartDate); // 更新开始日期（场景一保持不变，场景二更新为续卡日期）
+        member.setExpireDate(newExpireDate); // 更新到期日期
         member.setIsExpired(isExpired);
         member.setLastEmployeeId(request.getEmployeeId());
         
@@ -125,7 +173,9 @@ public class MemberService {
         record.setAmount(cardType.getPrice());
         record.setCommissionAmount(commissionAmount);
         record.setEmployeeId(request.getEmployeeId());
-        record.setTransactionDate(request.getRenewDate());
+        record.setTransactionDate(LocalDateTime.now()); // 交易日期时间（当前时间精确到秒）
+        record.setStartDate(orderStartDate); // 该笔订单的实际开始日期
+        record.setExpireDate(orderExpireDate); // 该笔订单的实际到期日期
         record.setRemark(request.getRemark());
         
         transactionRecordMapper.insert(record);
@@ -134,7 +184,7 @@ public class MemberService {
     }
     
     /**
-     * 计算到期日期
+     * 计算到期日期（从开始日期计算）
      */
     private LocalDate calculateExpireDate(LocalDate startDate, CardType cardType) {
         switch (cardType.getType()) {
@@ -147,6 +197,25 @@ public class MemberService {
             case "TIMES":
                 // 次卡有效期默认1年
                 return startDate.plusYears(1);
+            default:
+                throw new RuntimeException("未知的卡种类型");
+        }
+    }
+    
+    /**
+     * 从指定日期开始加时长（用于顺延续卡：在原到期日期基础上加新购时长）
+     */
+    private LocalDate addDurationToDate(LocalDate baseDate, CardType cardType) {
+        switch (cardType.getType()) {
+            case "MONTH":
+                return baseDate.plusMonths(cardType.getDuration());
+            case "QUARTER":
+                return baseDate.plusMonths(cardType.getDuration());
+            case "YEAR":
+                return baseDate.plusYears(cardType.getDuration());
+            case "TIMES":
+                // 次卡有效期默认1年
+                return baseDate.plusYears(1);
             default:
                 throw new RuntimeException("未知的卡种类型");
         }

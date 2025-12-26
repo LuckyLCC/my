@@ -51,17 +51,18 @@ public interface MemberMapper {
     List<Member> findAll(@Param("name") String name, @Param("phone") String phone, 
                         @Param("isExpired") Integer isExpired);
     
-    @Insert("INSERT INTO member (name, gender, phone, id_card, card_type_id, start_date, " +
-            "expire_date, remaining_times, is_expired, first_employee_id, last_employee_id, status) " +
-            "VALUES (#{name}, #{gender}, #{phone}, #{idCard}, #{cardTypeId}, #{startDate}, " +
-            "#{expireDate}, #{remainingTimes}, #{isExpired}, #{firstEmployeeId}, #{lastEmployeeId}, #{status})")
+    @Insert("INSERT INTO member (name, gender, phone, id_card, card_type_id, start_date, first_card_date, " +
+            "expire_date, pending_card_start_date, pending_card_type_id, pending_card_expire_date, remaining_times, is_expired, first_employee_id, last_employee_id, status) " +
+            "VALUES (#{name}, #{gender}, #{phone}, #{idCard}, #{cardTypeId}, #{startDate}, #{firstCardDate}, " +
+            "#{expireDate}, #{pendingCardStartDate}, #{pendingCardTypeId}, #{pendingCardExpireDate}, #{remainingTimes}, #{isExpired}, #{firstEmployeeId}, #{lastEmployeeId}, #{status})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Member member);
     
     @Update("UPDATE member SET name = #{name}, gender = #{gender}, phone = #{phone}, " +
             "id_card = #{idCard}, card_type_id = #{cardTypeId}, start_date = #{startDate}, " +
-            "expire_date = #{expireDate}, remaining_times = #{remainingTimes}, " +
-            "is_expired = #{isExpired}, last_employee_id = #{lastEmployeeId} WHERE id = #{id}")
+            "expire_date = #{expireDate}, pending_card_start_date = #{pendingCardStartDate}, " +
+            "pending_card_type_id = #{pendingCardTypeId}, pending_card_expire_date = #{pendingCardExpireDate}, " +
+            "remaining_times = #{remainingTimes}, is_expired = #{isExpired}, last_employee_id = #{lastEmployeeId} WHERE id = #{id}")
     int update(Member member);
     
     @Update("UPDATE member SET status = 0 WHERE id = #{id}")

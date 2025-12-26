@@ -39,9 +39,13 @@ test.describe('认证模块', () => {
     expect(token.length).toBeGreaterThan(0);
 
     // 验证页面跳转或显示主界面
-    // 检查是否显示会员管理或其他主界面元素
-    const hasMainContent = await page.locator('text=会员管理, text=卡种管理, .el-menu, .el-container').count();
-    expect(hasMainContent).toBeGreaterThan(0);
+    // 精确匹配左侧侧边栏的菜单项
+    const sidebar = page.locator('.el-aside');
+    await expect(sidebar).toBeVisible({ timeout: 5000 });
+    
+    // 验证"会员管理"菜单项在侧边栏中可见
+    const memberMenuItem = sidebar.locator('.el-menu-item').filter({ hasText: '会员管理' }).first();
+    await expect(memberMenuItem).toBeVisible({ timeout: 5000 });
   });
 
   test('登录失败应该显示错误信息', async ({ page }) => {

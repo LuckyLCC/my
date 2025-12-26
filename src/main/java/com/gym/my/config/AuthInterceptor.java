@@ -36,7 +36,15 @@ public class AuthInterceptor implements HandlerInterceptor {
         
         try {
             // 验证Token并刷新过期时间
-            Employee employee = authService.validateAndRefreshToken(token);
+            AuthService.TokenValidationResult result = authService.validateAndRefreshToken(token);
+            Employee employee = result.getEmployee();
+            
+            // 如果Token被刷新，将新Token存入request属性，供ResponseBodyAdvice使用
+            if (result.isTokenRefreshed()) {
+                request.setAttribute("newToken", result.getNewToken());
+                // 同时在响应头中也返回，方便前端处理
+                response.setHeader("X-New-Token", result.getNewToken());
+            }
             
             // 将用户信息存入request
             request.setAttribute("currentEmployee", employee);

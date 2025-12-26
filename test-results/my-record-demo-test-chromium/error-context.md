@@ -1,0 +1,428 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: Gym Admin
+        - generic [ref=e7]: 一体化后台
+      - menubar [ref=e8]:
+        - menuitem "会员管理" [ref=e9] [cursor=pointer]:
+          - img [ref=e11]
+          - generic [ref=e13]: 会员管理
+        - menuitem "卡种管理" [ref=e14] [cursor=pointer]:
+          - img [ref=e16]
+          - generic [ref=e18]: 卡种管理
+        - menuitem "员工管理" [ref=e19] [cursor=pointer]:
+          - img [ref=e21]
+          - generic [ref=e23]: 员工管理
+        - menuitem "提成规则" [ref=e24] [cursor=pointer]:
+          - img [ref=e26]
+          - generic [ref=e30]: 提成规则
+        - menuitem "开卡统计" [ref=e31] [cursor=pointer]:
+          - img [ref=e33]
+          - generic [ref=e36]: 开卡统计
+        - menuitem "交易明细" [ref=e37] [cursor=pointer]:
+          - img [ref=e39]
+          - generic [ref=e41]: 交易明细
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]: 会员管理
+          - generic [ref=e46]: "BaseURL:"
+          - generic [ref=e47]: http://localhost:8080
+        - generic [ref=e48]:
+          - generic [ref=e50]: 系统管理员 (ADMIN)
+          - button "退出" [ref=e51] [cursor=pointer]:
+            - generic [ref=e52]: 退出
+      - main [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - generic [ref=e57]: 会员管理
+            - generic [ref=e58]:
+              - textbox "姓名" [ref=e61]
+              - textbox "手机号" [ref=e64]
+              - textbox "是否过期(0/1)" [ref=e67]
+              - button "刷新" [ref=e68] [cursor=pointer]:
+                - generic [ref=e69]: 刷新
+              - button "新增" [ref=e70] [cursor=pointer]:
+                - generic [ref=e71]: 新增
+          - generic [ref=e73]:
+            - table [ref=e75]:
+              - rowgroup [ref=e96]:
+                - row "ID 姓名 性别 手机号 身份证号 卡种 开始日期 到期日期 到期提醒 剩余次数 过期(0/1) 最近签到时间 超过7天未签到 首次开卡员工 最新续卡员工 状态(1/0) 创建时间 更新时间 操作" [ref=e97]:
+                  - columnheader "ID" [ref=e98]:
+                    - generic [ref=e99]: ID
+                  - columnheader "姓名" [ref=e100]:
+                    - generic [ref=e101]: 姓名
+                  - columnheader "性别" [ref=e102]:
+                    - generic [ref=e103]: 性别
+                  - columnheader "手机号" [ref=e104]:
+                    - generic [ref=e105]: 手机号
+                  - columnheader "身份证号" [ref=e106]:
+                    - generic [ref=e107]: 身份证号
+                  - columnheader "卡种" [ref=e108]:
+                    - generic [ref=e109]: 卡种
+                  - columnheader "开始日期" [ref=e110]:
+                    - generic [ref=e111]: 开始日期
+                  - columnheader "到期日期" [ref=e112]:
+                    - generic [ref=e113]: 到期日期
+                  - columnheader "到期提醒" [ref=e114]:
+                    - generic [ref=e115]: 到期提醒
+                  - columnheader "剩余次数" [ref=e116]:
+                    - generic [ref=e117]: 剩余次数
+                  - columnheader "过期(0/1)" [ref=e118]:
+                    - generic [ref=e119]: 过期(0/1)
+                  - columnheader "最近签到时间" [ref=e120]:
+                    - generic [ref=e121]: 最近签到时间
+                  - columnheader "超过7天未签到" [ref=e122]:
+                    - generic [ref=e123]: 超过7天未签到
+                  - columnheader "首次开卡员工" [ref=e124]:
+                    - generic [ref=e125]: 首次开卡员工
+                  - columnheader "最新续卡员工" [ref=e126]:
+                    - generic [ref=e127]: 最新续卡员工
+                  - columnheader "状态(1/0)" [ref=e128]:
+                    - generic [ref=e129]: 状态(1/0)
+                  - columnheader "创建时间" [ref=e130]:
+                    - generic [ref=e131]: 创建时间
+                  - columnheader "更新时间" [ref=e132]:
+                    - generic [ref=e133]: 更新时间
+                  - columnheader "操作" [ref=e134]:
+                    - generic [ref=e135]: 操作
+            - table [ref=e140]:
+              - rowgroup [ref=e161]:
+                - row "28 3333 男 333 333 半年卡 2025-12-10 2026-06-10 0 未签到 是 系统管理员 系统管理员 启用 2025-12-26 00:44:58 2025-12-26 00:44:58 签到 续卡 签到记录 续卡历史 编辑 删除" [ref=e162]:
+                  - cell "28" [ref=e163]:
+                    - generic [ref=e164]: "28"
+                  - cell "3333" [ref=e165]:
+                    - generic [ref=e166]: "3333"
+                  - cell "男" [ref=e167]:
+                    - generic [ref=e168]: 男
+                  - cell "333" [ref=e169]:
+                    - generic [ref=e170]: "333"
+                  - cell "333" [ref=e171]:
+                    - generic [ref=e172]: "333"
+                  - cell "半年卡" [ref=e173]:
+                    - generic [ref=e174]: 半年卡
+                  - cell "2025-12-10" [ref=e175]:
+                    - generic [ref=e176]: 2025-12-10
+                  - cell "2026-06-10" [ref=e177]:
+                    - generic [ref=e178]: 2026-06-10
+                  - cell [ref=e179]
+                  - cell [ref=e180]
+                  - cell "0" [ref=e181]:
+                    - generic [ref=e182]: "0"
+                  - cell "未签到" [ref=e183]:
+                    - generic [ref=e184]: 未签到
+                  - cell "是" [ref=e185]:
+                    - generic [ref=e186]: 是
+                  - cell "系统管理员" [ref=e187]:
+                    - generic [ref=e188]: 系统管理员
+                  - cell "系统管理员" [ref=e189]:
+                    - generic [ref=e190]: 系统管理员
+                  - cell "启用" [ref=e191]:
+                    - generic [ref=e192]: 启用
+                  - cell "2025-12-26 00:44:58" [ref=e193]:
+                    - generic [ref=e194]: 2025-12-26 00:44:58
+                  - cell "2025-12-26 00:44:58" [ref=e195]:
+                    - generic [ref=e196]: 2025-12-26 00:44:58
+                  - cell "签到 续卡 签到记录 续卡历史 编辑 删除" [ref=e197]:
+                    - generic [ref=e199]:
+                      - button "签到" [ref=e200] [cursor=pointer]:
+                        - img [ref=e202]
+                        - generic [ref=e204]: 签到
+                      - button "续卡" [ref=e205] [cursor=pointer]:
+                        - img [ref=e207]
+                        - generic [ref=e209]: 续卡
+                      - button "签到记录" [ref=e210] [cursor=pointer]:
+                        - img [ref=e212]
+                        - generic [ref=e216]: 签到记录
+                      - button "续卡历史" [ref=e217] [cursor=pointer]:
+                        - img [ref=e219]
+                        - generic [ref=e221]: 续卡历史
+                      - button "编辑" [ref=e222] [cursor=pointer]:
+                        - img [ref=e224]
+                        - generic [ref=e227]: 编辑
+                      - button "删除" [ref=e228] [cursor=pointer]:
+                        - img [ref=e230]
+                        - generic [ref=e232]: 删除
+                - row "26 John Doe 男 13900000001 987654321098765432 半年卡 2025-12-20 2026-07-20 0 2025-12-25 21:21:20 否 系统管理员 刘畅 启用 2025-12-20 13:29:08 2025-12-20 20:44:24 签到 续卡 签到记录 续卡历史 编辑 删除" [ref=e233]:
+                  - cell "26" [ref=e234]:
+                    - generic [ref=e235]: "26"
+                  - cell "John Doe" [ref=e236]:
+                    - generic [ref=e237]: John Doe
+                  - cell "男" [ref=e238]:
+                    - generic [ref=e239]: 男
+                  - cell "13900000001" [ref=e240]:
+                    - generic [ref=e241]: "13900000001"
+                  - cell "987654321098765432" [ref=e242]:
+                    - generic [ref=e243]: "987654321098765432"
+                  - cell "半年卡" [ref=e244]:
+                    - generic [ref=e245]: 半年卡
+                  - cell "2025-12-20" [ref=e246]:
+                    - generic [ref=e247]: 2025-12-20
+                  - cell "2026-07-20" [ref=e248]:
+                    - generic [ref=e249]: 2026-07-20
+                  - cell [ref=e250]
+                  - cell [ref=e251]
+                  - cell "0" [ref=e252]:
+                    - generic [ref=e253]: "0"
+                  - cell "2025-12-25 21:21:20" [ref=e254]:
+                    - generic [ref=e255]: 2025-12-25 21:21:20
+                  - cell "否" [ref=e256]:
+                    - generic [ref=e257]: 否
+                  - cell "系统管理员" [ref=e258]:
+                    - generic [ref=e259]: 系统管理员
+                  - cell "刘畅" [ref=e260]:
+                    - generic [ref=e261]: 刘畅
+                  - cell "启用" [ref=e262]:
+                    - generic [ref=e263]: 启用
+                  - cell "2025-12-20 13:29:08" [ref=e264]:
+                    - generic [ref=e265]: 2025-12-20 13:29:08
+                  - cell "2025-12-20 20:44:24" [ref=e266]:
+                    - generic [ref=e267]: 2025-12-20 20:44:24
+                  - cell "签到 续卡 签到记录 续卡历史 编辑 删除" [ref=e268]:
+                    - generic [ref=e270]:
+                      - button "签到" [ref=e271] [cursor=pointer]:
+                        - img [ref=e273]
+                        - generic [ref=e275]: 签到
+                      - button "续卡" [ref=e276] [cursor=pointer]:
+                        - img [ref=e278]
+                        - generic [ref=e280]: 续卡
+                      - button "签到记录" [ref=e281] [cursor=pointer]:
+                        - img [ref=e283]
+                        - generic [ref=e287]: 签到记录
+                      - button "续卡历史" [ref=e288] [cursor=pointer]:
+                        - img [ref=e290]
+                        - generic [ref=e292]: 续卡历史
+                      - button "编辑" [ref=e293] [cursor=pointer]:
+                        - img [ref=e295]
+                        - generic [ref=e298]: 编辑
+                      - button "删除" [ref=e299] [cursor=pointer]:
+                        - img [ref=e301]
+                        - generic [ref=e303]: 删除
+                - row "25 Test User 男 13800000000 123456789012345678 月卡 2025-12-20 2026-01-20 0 2025-12-22 14:29:05 否 系统管理员 系统管理员 启用 2025-12-20 11:50:44 2025-12-20 11:50:44 签到 续卡 签到记录 续卡历史 编辑 删除" [ref=e304]:
+                  - cell "25" [ref=e305]:
+                    - generic [ref=e306]: "25"
+                  - cell "Test User" [ref=e307]:
+                    - generic [ref=e308]: Test User
+                  - cell "男" [ref=e309]:
+                    - generic [ref=e310]: 男
+                  - cell "13800000000" [ref=e311]:
+                    - generic [ref=e312]: "13800000000"
+                  - cell "123456789012345678" [ref=e313]:
+                    - generic [ref=e314]: "123456789012345678"
+                  - cell "月卡" [ref=e315]:
+                    - generic [ref=e316]: 月卡
+                  - cell "2025-12-20" [ref=e317]:
+                    - generic [ref=e318]: 2025-12-20
+                  - cell "2026-01-20" [ref=e319]:
+                    - generic [ref=e320]: 2026-01-20
+                  - cell [ref=e321]
+                  - cell [ref=e322]
+                  - cell "0" [ref=e323]:
+                    - generic [ref=e324]: "0"
+                  - cell "2025-12-22 14:29:05" [ref=e325]:
+                    - generic [ref=e326]: 2025-12-22 14:29:05
+                  - cell "否" [ref=e327]:
+                    - generic [ref=e328]: 否
+                  - cell "系统管理员" [ref=e329]:
+                    - generic [ref=e330]: 系统管理员
+                  - cell "系统管理员" [ref=e331]:
+                    - generic [ref=e332]: 系统管理员
+                  - cell "启用" [ref=e333]:
+                    - generic [ref=e334]: 启用
+                  - cell "2025-12-20 11:50:44" [ref=e335]:
+                    - generic [ref=e336]: 2025-12-20 11:50:44
+                  - cell "2025-12-20 11:50:44" [ref=e337]:
+                    - generic [ref=e338]: 2025-12-20 11:50:44
+                  - cell "签到 续卡 签到记录 续卡历史 编辑 删除" [ref=e339]:
+                    - generic [ref=e341]:
+                      - button "签到" [ref=e342] [cursor=pointer]:
+                        - img [ref=e344]
+                        - generic [ref=e346]: 签到
+                      - button "续卡" [ref=e347] [cursor=pointer]:
+                        - img [ref=e349]
+                        - generic [ref=e351]: 续卡
+                      - button "签到记录" [ref=e352] [cursor=pointer]:
+                        - img [ref=e354]
+                        - generic [ref=e358]: 签到记录
+                      - button "续卡历史" [ref=e359] [cursor=pointer]:
+                        - img [ref=e361]
+                        - generic [ref=e363]: 续卡历史
+                      - button "编辑" [ref=e364] [cursor=pointer]:
+                        - img [ref=e366]
+                        - generic [ref=e369]: 编辑
+                      - button "删除" [ref=e370] [cursor=pointer]:
+                        - img [ref=e372]
+                        - generic [ref=e374]: 删除
+          - dialog "新增 - 会员管理" [ref=e377]:
+            - generic [ref=e378]:
+              - generic [ref=e379]:
+                - heading "新增 - 会员管理" [level=2] [ref=e380]
+                - button "Close this dialog" [ref=e381] [cursor=pointer]:
+                  - img [ref=e383]
+              - generic [ref=e386]:
+                - generic [ref=e387]:
+                  - generic [ref=e388]: 姓名
+                  - textbox "姓名" [ref=e392]:
+                    - /placeholder: 请输入
+                    - text: "3333"
+                - generic [ref=e393]:
+                  - generic [ref=e394]: 性别
+                  - generic [ref=e397]:
+                    - generic [ref=e398]:
+                      - combobox "性别" [ref=e400]
+                      - generic [ref=e401]: 男
+                    - img [ref=e404] [cursor=pointer]
+                - generic [ref=e406]:
+                  - generic [ref=e407]: 手机号
+                  - textbox "手机号" [ref=e411]:
+                    - /placeholder: 请输入
+                    - text: "333"
+                - generic [ref=e412]:
+                  - generic [ref=e413]: 身份证号
+                  - textbox "身份证号" [ref=e417]:
+                    - /placeholder: 请输入
+                    - text: "333"
+                - generic [ref=e418]:
+                  - generic [ref=e419]: 卡种
+                  - generic [ref=e422]:
+                    - generic [ref=e423]:
+                      - combobox "卡种" [ref=e425]
+                      - generic [ref=e426]: 半年卡（¥19800）
+                    - img [ref=e429] [cursor=pointer]
+                - generic [ref=e431]:
+                  - generic [ref=e432]: 开始日期
+                  - generic [ref=e435]:
+                    - img [ref=e438]
+                    - combobox "开始日期" [expanded] [active] [ref=e440]
+                - generic [ref=e441]:
+                  - generic [ref=e442]: 员工归属
+                  - generic [ref=e445]:
+                    - generic [ref=e446]:
+                      - combobox "员工归属" [ref=e448]
+                      - generic [ref=e449]: 系统管理员 (admin)
+                    - img [ref=e452] [cursor=pointer]
+              - generic [ref=e454]:
+                - button "取消" [ref=e455] [cursor=pointer]:
+                  - generic [ref=e456]: 取消
+                - button "保存" [ref=e457] [cursor=pointer]:
+                  - generic [ref=e458]: 保存
+  - dialog [ref=e459]:
+    - generic [ref=e462]:
+      - generic [ref=e463]:
+        - generic [ref=e464]:
+          - button "Previous Year" [ref=e465] [cursor=pointer]:
+            - img [ref=e467]
+          - button "Previous Month" [ref=e469] [cursor=pointer]:
+            - img [ref=e471]
+        - button "2025" [ref=e473] [cursor=pointer]
+        - button "December" [ref=e474] [cursor=pointer]
+        - generic [ref=e475]:
+          - button "Next Month" [ref=e476] [cursor=pointer]:
+            - img [ref=e478]
+          - button "Next Year" [ref=e480] [cursor=pointer]:
+            - img [ref=e482]
+      - grid "Use the arrow keys and enter to select the day of the month" [ref=e485]:
+        - rowgroup [ref=e486]:
+          - row "Sunday Monday Tuesday Wednesday Thursday Friday Saturday" [ref=e487]:
+            - columnheader "Sunday" [ref=e488]: Sun
+            - columnheader "Monday" [ref=e489]: Mon
+            - columnheader "Tuesday" [ref=e490]: Tue
+            - columnheader "Wednesday" [ref=e491]: Wed
+            - columnheader "Thursday" [ref=e492]: Thu
+            - columnheader "Friday" [ref=e493]: Fri
+            - columnheader "Saturday" [ref=e494]: Sat
+          - row "30 1 2 3 4 5 6" [ref=e495]:
+            - gridcell "30" [ref=e496] [cursor=pointer]:
+              - generic [ref=e498]: "30"
+            - gridcell "1" [ref=e499] [cursor=pointer]:
+              - generic [ref=e501]: "1"
+            - gridcell "2" [ref=e502] [cursor=pointer]:
+              - generic [ref=e504]: "2"
+            - gridcell "3" [ref=e505] [cursor=pointer]:
+              - generic [ref=e507]: "3"
+            - gridcell "4" [ref=e508] [cursor=pointer]:
+              - generic [ref=e510]: "4"
+            - gridcell "5" [ref=e511] [cursor=pointer]:
+              - generic [ref=e513]: "5"
+            - gridcell "6" [ref=e514] [cursor=pointer]:
+              - generic [ref=e516]: "6"
+          - row "7 8 9 10 11 12 13" [ref=e517]:
+            - gridcell "7" [ref=e518] [cursor=pointer]:
+              - generic [ref=e520]: "7"
+            - gridcell "8" [ref=e521] [cursor=pointer]:
+              - generic [ref=e523]: "8"
+            - gridcell "9" [ref=e524] [cursor=pointer]:
+              - generic [ref=e526]: "9"
+            - gridcell "10" [ref=e527] [cursor=pointer]:
+              - generic [ref=e529]: "10"
+            - gridcell "11" [ref=e530] [cursor=pointer]:
+              - generic [ref=e532]: "11"
+            - gridcell "12" [ref=e533] [cursor=pointer]:
+              - generic [ref=e535]: "12"
+            - gridcell "13" [ref=e536] [cursor=pointer]:
+              - generic [ref=e538]: "13"
+          - row "14 15 16 17 18 19 20" [ref=e539]:
+            - gridcell "14" [ref=e540] [cursor=pointer]:
+              - generic [ref=e542]: "14"
+            - gridcell "15" [ref=e543] [cursor=pointer]:
+              - generic [ref=e545]: "15"
+            - gridcell "16" [ref=e546] [cursor=pointer]:
+              - generic [ref=e548]: "16"
+            - gridcell "17" [ref=e549] [cursor=pointer]:
+              - generic [ref=e551]: "17"
+            - gridcell "18" [ref=e552] [cursor=pointer]:
+              - generic [ref=e554]: "18"
+            - gridcell "19" [ref=e555] [cursor=pointer]:
+              - generic [ref=e557]: "19"
+            - gridcell "20" [ref=e558] [cursor=pointer]:
+              - generic [ref=e560]: "20"
+          - row "21 22 23 24 25 26 27" [ref=e561]:
+            - gridcell "21" [ref=e562] [cursor=pointer]:
+              - generic [ref=e564]: "21"
+            - gridcell "22" [ref=e565] [cursor=pointer]:
+              - generic [ref=e567]: "22"
+            - gridcell "23" [ref=e568] [cursor=pointer]:
+              - generic [ref=e570]: "23"
+            - gridcell "24" [ref=e571] [cursor=pointer]:
+              - generic [ref=e573]: "24"
+            - gridcell "25" [ref=e574] [cursor=pointer]:
+              - generic [ref=e576]: "25"
+            - gridcell "26" [ref=e577] [cursor=pointer]:
+              - generic [ref=e579]: "26"
+            - gridcell "27" [ref=e580] [cursor=pointer]:
+              - generic [ref=e582]: "27"
+          - row "28 29 30 31 1 2 3" [ref=e583]:
+            - gridcell "28" [ref=e584] [cursor=pointer]:
+              - generic [ref=e586]: "28"
+            - gridcell "29" [ref=e587] [cursor=pointer]:
+              - generic [ref=e589]: "29"
+            - gridcell "30" [ref=e590] [cursor=pointer]:
+              - generic [ref=e592]: "30"
+            - gridcell "31" [ref=e593] [cursor=pointer]:
+              - generic [ref=e595]: "31"
+            - gridcell "1" [ref=e596] [cursor=pointer]:
+              - generic [ref=e598]: "1"
+            - gridcell "2" [ref=e599] [cursor=pointer]:
+              - generic [ref=e601]: "2"
+            - gridcell "3" [ref=e602] [cursor=pointer]:
+              - generic [ref=e604]: "3"
+          - row "4 5 6 7 8 9 10" [ref=e605]:
+            - gridcell "4" [ref=e606] [cursor=pointer]:
+              - generic [ref=e608]: "4"
+            - gridcell "5" [ref=e609] [cursor=pointer]:
+              - generic [ref=e611]: "5"
+            - gridcell "6" [ref=e612] [cursor=pointer]:
+              - generic [ref=e614]: "6"
+            - gridcell "7" [ref=e615] [cursor=pointer]:
+              - generic [ref=e617]: "7"
+            - gridcell "8" [ref=e618] [cursor=pointer]:
+              - generic [ref=e620]: "8"
+            - gridcell "9" [ref=e621] [cursor=pointer]:
+              - generic [ref=e623]: "9"
+            - gridcell "10" [ref=e624] [cursor=pointer]:
+              - generic [ref=e626]: "10"
+```

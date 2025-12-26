@@ -14,7 +14,9 @@ public class TransactionRecord {
     private BigDecimal amount;
     private BigDecimal commissionAmount;
     private Long employeeId;
-    private LocalDate transactionDate;
+    private LocalDateTime transactionDate; // 交易日期时间（精确到秒）
+    private LocalDate startDate; // 卡开始日期
+    private LocalDate expireDate; // 卡到期日期
     private String remark;
     private LocalDateTime createdAt;
     

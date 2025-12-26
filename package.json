@@ -17,10 +17,10 @@
   "author": "Gym Management System",
   "license": "MIT",
   "devDependencies": {
-    "jest": "^29.0.0",
     "@babel/core": "^7.20.0",
     "@babel/preset-env": "^7.20.0",
-    "babel-jest": "^29.0.0"
+    "babel-jest": "^29.0.0",
+    "jest": "^29.0.0"
   },
   "jest": {
     "testEnvironment": "node",
@@ -31,5 +31,8 @@
       "**/__tests__/**/*.js",
       "**/frontend/**/*test*.js"
     ]
+  },
+  "dependencies": {
+    "@midscene/core": "^1.0.3"
   }
 }

@@ -47,7 +47,8 @@ public class AuthController {
             }
             
             // 验证token并获取用户信息
-            com.gym.my.entity.Employee employee = authService.validateAndRefreshToken(token);
+            AuthService.TokenValidationResult validationResult = authService.validateAndRefreshToken(token);
+            com.gym.my.entity.Employee employee = validationResult.getEmployee();
             
             Map<String, Object> result = new java.util.HashMap<>();
             result.put("employeeId", employee.getId());
@@ -58,6 +59,12 @@ public class AuthController {
             result.put("memberRead", employee.getMemberRead() != null && employee.getMemberRead() == 1);
             result.put("memberUpdate", employee.getMemberUpdate() != null && employee.getMemberUpdate() == 1);
             result.put("memberDelete", employee.getMemberDelete() != null && employee.getMemberDelete() == 1);
+            
+            // 如果Token被刷新，在响应中包含新Token
+            if (validationResult.isTokenRefreshed()) {
+                result.put("token", validationResult.getNewToken());
+                result.put("tokenRefreshed", true);
+            }
             
             return ResponseEntity.ok(ApiResponse.success(result));
         } catch (RuntimeException e) {

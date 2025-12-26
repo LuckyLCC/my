@@ -14,7 +14,7 @@ public interface EmployeeMapper {
     @Select("SELECT * FROM employee WHERE id = #{id}")
     Employee findById(Long id);
     
-    @Select("SELECT * FROM employee WHERE status = 1")
+    @Select("SELECT * FROM employee ORDER BY id DESC")
     List<Employee> findAll();
     
     @Insert("INSERT INTO employee (username, password, name, phone, role, status, " +

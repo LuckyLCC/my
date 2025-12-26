@@ -58,9 +58,9 @@ public interface TransactionRecordMapper {
                                     @Param("transactionType") String transactionType);
     
     @Insert("INSERT INTO transaction_record (member_id, card_type_id, transaction_type, amount, " +
-            "commission_amount, employee_id, transaction_date, remark) " +
+            "commission_amount, employee_id, transaction_date, start_date, expire_date, remark) " +
             "VALUES (#{memberId}, #{cardTypeId}, #{transactionType}, #{amount}, " +
-            "#{commissionAmount}, #{employeeId}, #{transactionDate}, #{remark})")
+            "#{commissionAmount}, #{employeeId}, #{transactionDate}, #{startDate}, #{expireDate}, #{remark})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(TransactionRecord record);
     

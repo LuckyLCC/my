@@ -140,10 +140,36 @@ public class AuthService {
     }
     
     /**
+     * Token验证结果
+     */
+    public static class TokenValidationResult {
+        private final Employee employee;
+        private final String newToken; // 如果Token被刷新，返回新Token；否则为null
+        
+        public TokenValidationResult(Employee employee, String newToken) {
+            this.employee = employee;
+            this.newToken = newToken;
+        }
+        
+        public Employee getEmployee() {
+            return employee;
+        }
+        
+        public String getNewToken() {
+            return newToken;
+        }
+        
+        public boolean isTokenRefreshed() {
+            return newToken != null;
+        }
+    }
+    
+    /**
      * 验证Token并刷新过期时间
+     * 如果Token即将过期（剩余时间少于5分钟），自动生成新Token
      */
     @Transactional
-    public Employee validateAndRefreshToken(String token) {
+    public TokenValidationResult validateAndRefreshToken(String token) {
         if (token == null || token.isEmpty()) {
             throw new RuntimeException("Token不能为空");
         }
@@ -158,7 +184,8 @@ public class AuthService {
             
             // 检查token是否过期（JWT库会自动检查，但我们可以额外验证）
             Date expiration = claims.getExpiration();
-            if (expiration != null && expiration.before(new Date())) {
+            Date now = new Date();
+            if (expiration != null && expiration.before(now)) {
                 throw new RuntimeException("Token已过期");
             }
             
@@ -175,11 +202,7 @@ public class AuthService {
                 throw new RuntimeException("Session已过期，请重新登录");
             }
             
-            // 刷新过期时间
-            session.setExpiresAt(LocalDateTime.now().plusMinutes(SESSION_TIMEOUT_MINUTES));
-            sessionMapper.updateExpiration(token, session.getExpiresAt());
-            
-            // 返回员工信息
+            // 获取员工信息
             Employee employee = employeeMapper.findById(session.getEmployeeId());
             if (employee == null) {
                 throw new RuntimeException("用户不存在");
@@ -190,8 +213,50 @@ public class AuthService {
                 throw new RuntimeException("账号已被禁用");
             }
             
-            return employee;
+            // 检查Token是否即将过期（剩余时间少于5分钟），如果是则自动刷新
+            long remainingMillis = expiration != null ? (expiration.getTime() - now.getTime()) : 0;
+            long refreshThresholdMillis = 5 * 60 * 1000; // 5分钟
+            
+            String newToken = null;
+            if (remainingMillis < refreshThresholdMillis) {
+                // Token即将过期，生成新Token
+                newToken = generateToken(employee);
+                
+                // 更新数据库Session，使用新Token
+                LocalDateTime newExpiresAt = LocalDateTime.now().plusMinutes(SESSION_TIMEOUT_MINUTES);
+                session.setToken(newToken);
+                session.setExpiresAt(newExpiresAt);
+                sessionMapper.updateByEmployeeId(employee.getId(), newToken, newExpiresAt);
+            } else {
+                // Token还有足够时间，只刷新Session过期时间
+                LocalDateTime newExpiresAt = LocalDateTime.now().plusMinutes(SESSION_TIMEOUT_MINUTES);
+                sessionMapper.updateExpiration(token, newExpiresAt);
+            }
+            
+            return new TokenValidationResult(employee, newToken);
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            // JWT token已过期，尝试从过期Token中获取员工ID，检查是否有有效Session
+            try {
+                io.jsonwebtoken.Claims expiredClaims = e.getClaims();
+                Long employeeId = expiredClaims.get("employeeId", Long.class);
+                if (employeeId != null) {
+                    // 检查数据库中是否有有效的Session（可能Session过期时间更长）
+                    UserSession session = sessionMapper.findByEmployeeId(employeeId);
+                    if (session != null && session.getExpiresAt() != null && 
+                        session.getExpiresAt().isAfter(LocalDateTime.now())) {
+                        // 数据库Session仍然有效，生成新Token
+                        Employee employee = employeeMapper.findById(employeeId);
+                        if (employee != null && employee.getStatus() != 0) {
+                            String newToken = generateToken(employee);
+                            LocalDateTime newExpiresAt = LocalDateTime.now().plusMinutes(SESSION_TIMEOUT_MINUTES);
+                            sessionMapper.updateByEmployeeId(employeeId, newToken, newExpiresAt);
+                            return new TokenValidationResult(employee, newToken);
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                // 忽略，继续执行清理逻辑
+            }
             // JWT token已过期，清理数据库session
             sessionMapper.deleteByToken(token);
             throw new RuntimeException("Token已过期，请重新登录");
@@ -207,6 +272,14 @@ public class AuthService {
         } catch (Exception e) {
             throw new RuntimeException("Token验证失败：" + e.getMessage());
         }
+    }
+    
+    /**
+     * 验证Token（兼容旧接口，返回Employee）
+     */
+    @Transactional
+    public Employee validateToken(String token) {
+        return validateAndRefreshToken(token).getEmployee();
     }
     
     /**
