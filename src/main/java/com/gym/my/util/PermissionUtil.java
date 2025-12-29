@@ -57,6 +57,14 @@ public class PermissionUtil {
     }
     
     /**
+     * 检查员工是否为管理员
+     */
+    public static boolean isAdmin(Employee employee) {
+        if (employee == null) return false;
+        return "ADMIN".equals(employee.getRole());
+    }
+    
+    /**
      * 从request中获取当前员工
      */
     public static Employee getCurrentEmployee(HttpServletRequest request) {

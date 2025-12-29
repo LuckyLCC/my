@@ -227,6 +227,20 @@
           const checkinHistory = ref([]);
           const currentCheckinMember = ref(null);
           const checkinLoading = ref(false);
+          
+          // 会员操作抽屉
+          const memberActionDrawerVisible = ref(false);
+          const selectedMemberForAction = ref(null);
+          
+          function openMemberActionDrawer(row) {
+            selectedMemberForAction.value = row;
+            memberActionDrawerVisible.value = true;
+          }
+          
+          function closeMemberActionDrawer() {
+            memberActionDrawerVisible.value = false;
+            selectedMemberForAction.value = null;
+          }
 
           const cardDetailVisible = ref(false);
           const cardDetailList = ref([]);
@@ -248,6 +262,14 @@
           const renewHistoryLoading = ref(false);
 
           const summaryInfo = ref(null); // 用于存储开卡统计汇总信息
+
+          // 定时任务相关状态
+          const taskLoading = reactive({
+            activatePendingCards: false,
+            forceActivatePendingCards: false,
+            updateExpiredMembers: false,
+            cleanExpiredSessions: false
+          });
 
           const listParams = reactive({});
 
@@ -483,21 +505,28 @@
             }
           }
 
-          async function doCheckin(row) {
-            checkinLoading.value = true;
-            try {
-              const res = await http.post(`/api/members/${row.id}/checkin`);
-              const body = res.data || {};
-              if (body.code !== 200) throw new Error(body.message || '签到失败');
-              ElementPlus.ElMessage.success(body.message || '签到成功');
-              await loadList(); // 刷新列表
-            } catch (e) {
-              const serverMsg = e?.response?.data?.message;
-              ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
-            } finally {
-              checkinLoading.value = false;
+            async function doCheckin(row) {
+              checkinLoading.value = true;
+              try {
+                const res = await http.post(`/api/members/${row.id}/checkin`);
+                const body = res.data || {};
+                if (body.code !== 200) throw new Error(body.message || '签到失败');
+                ElementPlus.ElMessage.success(body.message || '签到成功');
+                await loadList(); // 刷新列表
+                // 如果抽屉是打开的，更新选中会员的信息
+                if (memberActionDrawerVisible.value && selectedMemberForAction.value?.id === row.id) {
+                  const updatedMember = rows.value.find(r => r.id === row.id);
+                  if (updatedMember) {
+                    selectedMemberForAction.value = updatedMember;
+                  }
+                }
+              } catch (e) {
+                const serverMsg = e?.response?.data?.message;
+                ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
+              } finally {
+                checkinLoading.value = false;
+              }
             }
-          }
 
           async function openCheckinHistory(row) {
             currentCheckinMember.value = row;
@@ -828,7 +857,10 @@
             openCardDetail,
             cardDetailVisible, cardDetailList, currentCardDetailEmployee,
             summaryInfo,
+            taskLoading,
             formatValue, renderField,
+            // 会员操作抽屉
+            memberActionDrawerVisible, selectedMemberForAction, openMemberActionDrawer, closeMemberActionDrawer,
             employees: computed(() => Array.isArray(props.employees) ? props.employees : []),
             // 将 props 也返回，以便在 render 中使用
             cardTypes: computed(() => Array.isArray(props.cardTypes) ? props.cardTypes : []),
@@ -837,9 +869,11 @@
         },
         render() {
           const m = this.module;
-          // 在 render 中通过 this 访问 setup 返回的 computed
+          // 在 render 中通过 this 访问 setup 返回的 computed 和 props
           const cardTypes = this.cardTypes || [];
           const employees = this.employeesList || [];
+          // 在 Vue 3 中，props 会自动暴露到 this 上，也可以通过 this.$props 访问
+          const currentUser = this.$props?.currentUser || {};
 
           return h('div', { class: 'card' }, [
             h('div', { class: 'toolbar' }, [
@@ -884,7 +918,107 @@
                   });
                 }),
                 h(ElementPlus.ElButton, { type: 'primary', onClick: this.loadList }, () => '刷新'),
-                this.canCreate ? h(ElementPlus.ElButton, { type: 'success', onClick: this.openCreate }, () => '新增') : null
+                this.canCreate ? h(ElementPlus.ElButton, { type: 'success', onClick: this.openCreate }, () => '新增') : null,
+                // 系统管理：定时任务按钮（仅管理员且仅在员工管理页面显示）
+                (m.key === 'employees' && currentUser?.role === 'ADMIN' ? [
+                  h(ElementPlus.ElDivider, { direction: 'vertical' }),
+                  h(ElementPlus.ElButton, {
+                    type: 'warning',
+                    size: 'small',
+                    loading: this.taskLoading.activatePendingCards,
+                    onClick: async () => {
+                      this.taskLoading.activatePendingCards = true;
+                      try {
+                        const res = await http.post('/api/admin/tasks/activate-pending-cards');
+                        const body = res.data || {};
+                        if (body.code === 200) {
+                          ElementPlus.ElMessage.success(body.message || '激活未生效卡种任务执行成功');
+                        } else {
+                          ElementPlus.ElMessage.error(body.message || '执行失败');
+                        }
+                      } catch (e) {
+                        const serverMsg = e?.response?.data?.message;
+                        ElementPlus.ElMessage.error(serverMsg || e?.message || '执行失败');
+                      } finally {
+                        this.taskLoading.activatePendingCards = false;
+                      }
+                      // 如果是在会员管理页面，刷新列表
+                      if (m.key === 'members' && this.loadList) {
+                        await this.loadList();
+                      }
+                    }
+                  }, () => '激活未生效卡种（仅限今天及之前的）'),
+                  h(ElementPlus.ElButton, {
+                    type: 'warning',
+                    size: 'small',
+                    loading: this.taskLoading.forceActivatePendingCards,
+                    onClick: async () => {
+                      this.taskLoading.forceActivatePendingCards = true;
+                      try {
+                        const res = await http.post('/api/admin/tasks/force-activate-pending-cards');
+                        const body = res.data || {};
+                        if (body.code === 200) {
+                          ElementPlus.ElMessage.success(body.message || '强制激活未生效卡种任务执行成功');
+                        } else {
+                          ElementPlus.ElMessage.error(body.message || '执行失败');
+                        }
+                      } catch (e) {
+                        const serverMsg = e?.response?.data?.message;
+                        ElementPlus.ElMessage.error(serverMsg || e?.message || '执行失败');
+                      } finally {
+                        this.taskLoading.forceActivatePendingCards = false;
+                      }
+                      // 如果是在会员管理页面，刷新列表
+                      if (m.key === 'members' && this.loadList) {
+                        await this.loadList();
+                      }
+                    }
+                  }, () => '强制激活所有未生效卡种（包括未来日期）'),
+                  h(ElementPlus.ElButton, {
+                    type: 'info',
+                    size: 'small',
+                    loading: this.taskLoading.updateExpiredMembers,
+                    onClick: async () => {
+                      this.taskLoading.updateExpiredMembers = true;
+                      try {
+                        const res = await http.post('/api/admin/tasks/update-expired-members');
+                        const body = res.data || {};
+                        if (body.code === 200) {
+                          ElementPlus.ElMessage.success(body.message || '更新过期会员任务执行成功');
+                        } else {
+                          ElementPlus.ElMessage.error(body.message || '执行失败');
+                        }
+                      } catch (e) {
+                        const serverMsg = e?.response?.data?.message;
+                        ElementPlus.ElMessage.error(serverMsg || e?.message || '执行失败');
+                      } finally {
+                        this.taskLoading.updateExpiredMembers = false;
+                      }
+                    }
+                  }, () => '更新过期会员'),
+                  h(ElementPlus.ElButton, {
+                    type: 'danger',
+                    size: 'small',
+                    loading: this.taskLoading.cleanExpiredSessions,
+                    onClick: async () => {
+                      this.taskLoading.cleanExpiredSessions = true;
+                      try {
+                        const res = await http.post('/api/admin/tasks/clean-expired-sessions');
+                        const body = res.data || {};
+                        if (body.code === 200) {
+                          ElementPlus.ElMessage.success(body.message || '清理过期Session任务执行成功');
+                        } else {
+                          ElementPlus.ElMessage.error(body.message || '执行失败');
+                        }
+                      } catch (e) {
+                        const serverMsg = e?.response?.data?.message;
+                        ElementPlus.ElMessage.error(serverMsg || e?.message || '执行失败');
+                      } finally {
+                        this.taskLoading.cleanExpiredSessions = false;
+                      }
+                    }
+                  }, () => '清理过期Session')
+                ] : null)
               ])
             ]),
 
@@ -927,9 +1061,162 @@
               style: 'width: 100%; margin-top: 12px;',
               height: m.tableHeight || undefined,
               // loading overlay for table
-              loading: this.loading
+              loading: this.loading,
+              rowKey: 'id',
+              // 会员管理模块：添加行点击事件和展开功能
+              ...(m.key === 'members' ? {
+                onRowClick: (row) => {
+                  // 如果点击的是已经选中的行，关闭面板
+                  if (this.selectedMemberForAction && row.id === this.selectedMemberForAction.id) {
+                    this.closeMemberActionDrawer();
+                  } else {
+                    this.openMemberActionDrawer(row);
+                  }
+                },
+                rowStyle: { cursor: 'pointer' },
+                expandRowKeys: this.memberActionDrawerVisible && this.selectedMemberForAction 
+                  ? [this.selectedMemberForAction.id] 
+                  : []
+              } : {})
             }, {
               default: () => [
+                // 展开面板列（仅会员管理模块）
+                ...(m.key === 'members' ? [h(ElementPlus.ElTableColumn, {
+                  type: 'expand',
+                  width: 50,
+                  label: ''
+                }, {
+                  default: ({ row }) => {
+                    const member = this.selectedMemberForAction;
+                    if (!member || member.id !== row.id) return null;
+                      
+                    return h('div', {
+                      style: 'padding: 20px; background: #fff;'
+                    }, [
+                      // 标题栏（带关闭按钮）
+                      h('div', {
+                        style: 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #ebeef5;'
+                      }, [
+                        h('div', {
+                          style: 'font-size: 16px; font-weight: bold; color: #303133;'
+                        }, `会员操作 - ${member.name || ''}`),
+                        h(ElementPlus.ElButton, {
+                          type: 'text',
+                          icon: 'Close',
+                          onClick: () => this.closeMemberActionDrawer(),
+                          style: 'padding: 0;'
+                        })
+                      ]),
+                      
+                      // 内容区域：左侧会员信息，右侧操作按钮
+                      h('div', {
+                        style: 'display: flex; gap: 30px;'
+                      }, [
+                        // 左侧：会员基本信息
+                        h('div', {
+                          style: 'flex: 1;'
+                        }, [
+                          h(ElementPlus.ElCard, {
+                            shadow: 'never',
+                            style: 'border: 1px solid #ebeef5;'
+                          }, {
+                            header: () => h('div', { style: 'font-weight: bold; font-size: 14px;' }, '会员信息'),
+                            default: () => h('div', {
+                              style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 16px;'
+                            }, [
+                              h('div', [
+                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '姓名'),
+                                h('div', { style: 'font-size: 14px; font-weight: 500;' }, member.name || '-')
+                              ]),
+                              h('div', [
+                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '手机号'),
+                                h('div', { style: 'font-size: 14px;' }, member.phone || '-')
+                              ]),
+                              h('div', [
+                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '卡种'),
+                                h('div', { style: 'font-size: 14px;' }, member.cardType?.name || '-')
+                              ]),
+                              h('div', [
+                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '到期日期'),
+                                h('div', { style: 'font-size: 14px;' }, member.expireDate || '-')
+                              ])
+                            ])
+                          })
+                        ]),
+                        
+                        // 右侧：操作按钮
+                        h('div', {
+                          style: 'flex: 0 0 300px;'
+                        }, [
+                          h('div', {
+                            style: 'display: flex; flex-direction: column; gap: 12px;'
+                          }, [
+                            h(ElementPlus.ElButton, {
+                              type: 'success',
+                              size: 'default',
+                              icon: 'Check',
+                              loading: this.checkinLoading,
+                              onClick: () => {
+                                this.doCheckin(member);
+                              },
+                              style: 'width: 100%;'
+                            }, () => '签到'),
+                            h(ElementPlus.ElButton, {
+                              type: 'warning',
+                              size: 'default',
+                              icon: 'Refresh',
+                              onClick: () => {
+                                this.openRenew(member);
+                                this.closeMemberActionDrawer();
+                              },
+                              style: 'width: 100%;'
+                            }, () => '续卡'),
+                            h(ElementPlus.ElButton, {
+                              type: 'info',
+                              size: 'default',
+                              icon: 'Clock',
+                              onClick: () => {
+                                this.openCheckinHistory(member);
+                                this.closeMemberActionDrawer();
+                              },
+                              style: 'width: 100%;'
+                            }, () => '签到记录'),
+                            h(ElementPlus.ElButton, {
+                              type: 'info',
+                              size: 'default',
+                              icon: 'Document',
+                              onClick: () => {
+                                this.openRenewHistory(member);
+                                this.closeMemberActionDrawer();
+                              },
+                              style: 'width: 100%;'
+                            }, () => '续卡历史'),
+                            this.canUpdate ? h(ElementPlus.ElButton, {
+                              type: 'primary',
+                              size: 'default',
+                              icon: 'Edit',
+                              onClick: () => {
+                                this.openEdit(member);
+                                this.closeMemberActionDrawer();
+                              },
+                              style: 'width: 100%;'
+                            }, () => '编辑') : null,
+                            this.canDelete ? h(ElementPlus.ElButton, {
+                              type: 'danger',
+                              size: 'default',
+                              icon: 'Delete',
+                              onClick: async () => {
+                                await this.doDelete(member);
+                                this.closeMemberActionDrawer();
+                              },
+                              style: 'width: 100%;'
+                            }, () => '删除') : null
+                          ].filter(Boolean))
+                        ])
+                      ])
+                    ]);
+                  }
+                })] : []),
                 ...(m.columns || []).map(col => h(ElementPlus.ElTableColumn, {
                   key: col.key,
                   prop: col.key,
@@ -997,44 +1284,14 @@
                     return formatValue(col.key, cellValue);
                   }
                 })),
-                ((this.canDelete || this.canUpdate || m.key === 'members') ? h(ElementPlus.ElTableColumn, {
+                // 会员管理模块：移除操作列，改为点击行显示抽屉
+                // 其他模块：保留操作列
+                ((this.canDelete || this.canUpdate) && m.key !== 'members' ? h(ElementPlus.ElTableColumn, {
                   label: '操作',
                   fixed: 'right',
-                  width: m.key === 'members' ? 360 : 200
+                  width: 200
                 }, {
                   default: ({ row }) => h('div', { style: 'display:flex; gap:6px; flex-wrap: wrap; align-items: center;' }, [
-                    // 会员管理模块：签到按钮、续卡按钮和历史记录按钮
-                    (m.key === 'members' ? [
-                      h(ElementPlus.ElButton, {
-                        type: 'success',
-                        size: 'small',
-                        icon: 'Check',
-                        loading: this.checkinLoading,
-                        onClick: () => this.doCheckin(row),
-                        style: 'border-radius: 4px; font-weight: 500;'
-                      }, () => '签到'),
-                      h(ElementPlus.ElButton, {
-                        type: 'warning',
-                        size: 'small',
-                        icon: 'Refresh',
-                        onClick: () => this.openRenew(row),
-                        style: 'border-radius: 4px; font-weight: 500;'
-                      }, () => '续卡'),
-                      h(ElementPlus.ElButton, {
-                        type: 'info',
-                        size: 'small',
-                        icon: 'Clock',
-                        onClick: () => this.openCheckinHistory(row),
-                        style: 'border-radius: 4px; font-weight: 500;'
-                      }, () => '签到记录'),
-                      h(ElementPlus.ElButton, {
-                        type: 'info',
-                        size: 'small',
-                        icon: 'Document',
-                        onClick: () => this.openRenewHistory(row),
-                        style: 'border-radius: 4px; font-weight: 500;'
-                      }, () => '续卡历史')
-                    ] : []),
                     (this.canUpdate ? h(ElementPlus.ElButton, {
                       type: 'primary',
                       size: 'small',

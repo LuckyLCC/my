@@ -69,11 +69,11 @@ public interface TransactionRecordMapper {
             "tr.employee_id as employeeId, " +
             "e.name as employeeName, " +
             "DATE_FORMAT(tr.transaction_date, '%Y-%m') as month, " +
-            "SUM(tr.commission_amount) as totalCommission, " +
+            "COALESCE(SUM(tr.commission_amount), 0.00) as totalCommission, " +
             "SUM(CASE WHEN tr.transaction_type = 'NEW' THEN 1 ELSE 0 END) as newCardCount, " +
-            "SUM(CASE WHEN tr.transaction_type = 'NEW' THEN tr.commission_amount ELSE 0 END) as newCardCommission, " +
+            "COALESCE(SUM(CASE WHEN tr.transaction_type = 'NEW' THEN tr.commission_amount ELSE 0 END), 0.00) as newCardCommission, " +
             "SUM(CASE WHEN tr.transaction_type = 'RENEW' THEN 1 ELSE 0 END) as renewCount, " +
-            "SUM(CASE WHEN tr.transaction_type = 'RENEW' THEN tr.commission_amount ELSE 0 END) as renewCommission " +
+            "COALESCE(SUM(CASE WHEN tr.transaction_type = 'RENEW' THEN tr.commission_amount ELSE 0 END), 0.00) as renewCommission " +
             "FROM transaction_record tr " +
             "LEFT JOIN employee e ON tr.employee_id = e.id " +
             "WHERE DATE_FORMAT(tr.transaction_date, '%Y-%m') = #{month} " +
@@ -89,8 +89,8 @@ public interface TransactionRecordMapper {
             "e.name as employeeName, " +
             "DATE_FORMAT(tr.transaction_date, '%Y-%m') as month, " +
             "COUNT(*) as cardCount, " +
-            "SUM(tr.amount) as totalCardAmount, " +
-            "SUM(tr.commission_amount) as totalCommissionAmount " +
+            "COALESCE(SUM(tr.amount), 0.00) as totalCardAmount, " +
+            "COALESCE(SUM(tr.commission_amount), 0.00) as totalCommissionAmount " +
             "FROM transaction_record tr " +
             "LEFT JOIN employee e ON tr.employee_id = e.id " +
             "WHERE DATE_FORMAT(tr.transaction_date, '%Y-%m') = #{month} " +
@@ -145,7 +145,7 @@ public interface TransactionRecordMapper {
      * 获取当月所有员工总共开卡金额（包括NEW和RENEW）
      */
     @Select("SELECT " +
-            "COALESCE(SUM(tr.amount), 0) as totalCardAmount, " +
+            "COALESCE(SUM(tr.amount), 0.00) as totalCardAmount, " +
             "COUNT(*) as totalCardCount " +
             "FROM transaction_record tr " +
             "WHERE DATE_FORMAT(tr.transaction_date, '%Y-%m') = #{month} " +

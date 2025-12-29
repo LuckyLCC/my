@@ -104,11 +104,11 @@ public class FinancialService {
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(stat.getEmployeeName());
             row.createCell(1).setCellValue(stat.getMonth());
-            row.createCell(2).setCellValue(stat.getTotalCommission().doubleValue());
+            row.createCell(2).setCellValue(stat.getTotalCommission() != null ? stat.getTotalCommission().doubleValue() : 0.0);
             row.createCell(3).setCellValue(stat.getNewCardCount());
-            row.createCell(4).setCellValue(stat.getNewCardCommission().doubleValue());
+            row.createCell(4).setCellValue(stat.getNewCardCommission() != null ? stat.getNewCardCommission().doubleValue() : 0.0);
             row.createCell(5).setCellValue(stat.getRenewCount());
-            row.createCell(6).setCellValue(stat.getRenewCommission().doubleValue());
+            row.createCell(6).setCellValue(stat.getRenewCommission() != null ? stat.getRenewCommission().doubleValue() : 0.0);
         }
         
         // 自动调整列宽

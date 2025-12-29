@@ -89,6 +89,17 @@ public interface MemberMapper {
     List<Member> findMembersWithPendingCardsToActivate();
     
     /**
+     * 查询所有有未生效卡种的会员（不限制日期，用于强制激活）
+     */
+    @Select("SELECT * FROM member WHERE pending_card_start_date IS NOT NULL " +
+            "AND pending_card_type_id IS NOT NULL AND status = 1")
+    @Results({
+        @Result(property = "cardType", column = "card_type_id",
+                one = @One(select = "com.gym.my.mapper.CardTypeMapper.findById"))
+    })
+    List<Member> findAllMembersWithPendingCards();
+    
+    /**
      * 激活未生效的卡种：将未生效卡种信息更新到当前卡种，并清空未生效卡种字段
      */
     @Update("UPDATE member SET " +

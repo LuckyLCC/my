@@ -36,8 +36,8 @@ public class ScheduledTasks {
     public void activatePendingCards() {
         log.info("开始执行定时任务：激活未生效卡种");
         try {
-            memberService.activatePendingCards();
-            log.info("定时任务执行成功：激活未生效卡种");
+            int activatedCount = memberService.activatePendingCards();
+            log.info("定时任务执行成功：激活未生效卡种，共激活 {} 个", activatedCount);
         } catch (Exception e) {
             log.error("定时任务执行失败：激活未生效卡种", e);
         }

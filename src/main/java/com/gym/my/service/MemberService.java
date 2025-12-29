@@ -395,11 +395,15 @@ public class MemberService {
     /**
      * 激活未生效的卡种（定时任务调用）
      * 检查所有未生效卡种的开始日期，如果 <= 今天，则激活该卡种
+     * @return 激活的会员数量
      */
     @Transactional
-    public void activatePendingCards() {
+    public int activatePendingCards() {
         List<Member> membersToActivate = memberMapper.findMembersWithPendingCardsToActivate();
         
+        log.info("查询到 {} 个需要激活的未生效卡种", membersToActivate.size());
+        
+        int activatedCount = 0;
         for (Member member : membersToActivate) {
             if (member.getPendingCardStartDate() != null 
                 && member.getPendingCardTypeId() != null 
@@ -427,11 +431,67 @@ public class MemberService {
                     member.getName(), member.getId(), 
                     member.getPendingCardStartDate(), 
                     member.getPendingCardExpireDate());
+                activatedCount++;
             }
         }
         
-        if (!membersToActivate.isEmpty()) {
-            log.info("共激活 {} 个未生效的卡种", membersToActivate.size());
+        if (activatedCount == 0) {
+            log.info("没有需要激活的未生效卡种（所有未生效卡种的开始日期都是未来日期，需要等到开始日期到了才会激活）");
+        } else {
+            log.info("共激活 {} 个未生效的卡种", activatedCount);
         }
+        
+        return activatedCount;
+    }
+    
+    /**
+     * 强制激活所有未生效卡种（不限制开始日期，用于管理员手动触发）
+     * @return 激活的会员数量
+     */
+    @Transactional
+    public int forceActivateAllPendingCards() {
+        List<Member> membersToActivate = memberMapper.findAllMembersWithPendingCards();
+        
+        log.info("强制激活：查询到 {} 个有未生效卡种的会员（不限制开始日期）", membersToActivate.size());
+        
+        int activatedCount = 0;
+        for (Member member : membersToActivate) {
+            if (member.getPendingCardStartDate() != null 
+                && member.getPendingCardTypeId() != null 
+                && member.getPendingCardExpireDate() != null) {
+                
+                // 如果是次卡，需要在激活前计算需要增加的次数
+                CardType pendingCardType = cardTypeMapper.findById(member.getPendingCardTypeId());
+                Integer newRemainingTimes = null;
+                
+                if (pendingCardType != null && "TIMES".equals(pendingCardType.getType())) {
+                    // 次卡：需要增加次数
+                    int currentTimes = member.getRemainingTimes() != null ? member.getRemainingTimes() : 0;
+                    newRemainingTimes = currentTimes + pendingCardType.getDuration();
+                }
+                
+                // 激活未生效的卡种
+                memberMapper.activatePendingCard(member);
+                
+                // 如果是次卡，更新剩余次数
+                if (newRemainingTimes != null) {
+                    memberMapper.updateRemainingTimes(member.getId(), newRemainingTimes);
+                }
+                
+                log.info("强制激活：会员 {} (ID: {}) 的未生效卡种已激活，原开始日期: {}, 到期日期: {}", 
+                    member.getName(), member.getId(), 
+                    member.getPendingCardStartDate(), 
+                    member.getPendingCardExpireDate());
+                activatedCount++;
+            }
+        }
+        
+        if (activatedCount == 0) {
+            log.info("强制激活：没有需要激活的未生效卡种");
+        } else {
+            log.info("强制激活：共激活 {} 个未生效的卡种", activatedCount);
+        }
+        
+        return activatedCount;
     }
 }
