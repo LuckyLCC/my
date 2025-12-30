@@ -29,36 +29,117 @@
     }
     .brand small { opacity: 0.7; font-weight: 600; margin-left: 8px; }
     .header {
-      height: 56px;
+      height: 64px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
+      padding: 0 24px;
       background: #fff;
-      border-bottom: 1px solid #ebeef5;
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-title-main {
+      font-size: 18px;
+      font-weight: bold;
+      color: rgba(30,41,57,1);
+      line-height: 1.5;
+    }
+    .header-baseurl {
+      padding: 4px 12px;
+      border-radius: 4px;
+      background: rgba(243,244,246,1);
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      color: rgba(113,113,130,1);
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-admin-tag {
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(220,252,231,1);
+      background: rgba(240,253,244,1);
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      color: rgba(0,130,54,1);
+    }
+    .header-logout-btn {
+      padding: 6px 16px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.1);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: rgba(10,10,10,1);
+      cursor: pointer;
+      font-weight: 500;
     }
     .content {
       padding: 16px;
-      height: calc(100vh - 56px);
+      height: calc(100vh - 64px);
       overflow: auto;
       background: #f5f7fa;
     }
     .card {
       background: #fff;
       border: 1px solid #ebeef5;
-      border-radius: 12px;
+      border-radius: 4px;
       padding: 16px;
-      box-shadow: 0 1px 2px rgba(16,24,40,0.04);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.12), 0 0 6px rgba(0,0,0,0.04);
+    }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .page-title-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .page-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: rgba(30,41,57,1);
+      line-height: 1.5;
+    }
+    .page-total {
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.1);
+      background: rgba(249,250,251,1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: rgba(113,113,130,1);
     }
     .toolbar {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
+      justify-content: flex-end;
+      margin-bottom: 16px;
       flex-wrap: wrap;
     }
-    .toolbar-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .toolbar-left { 
+      display: flex; 
+      gap: 8px; 
+      align-items: center; 
+      flex-wrap: wrap;
+    }
     .muted { color: #64748b; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .full-width { width: 100%; }
@@ -469,6 +550,13 @@
               if (body.code !== 200) throw new Error(body.message || '更新失败');
               editDialogVisible.value = false;
               await loadList();
+              // 如果展开面板是打开的，更新选中会员的信息
+              if (memberActionDrawerVisible.value && selectedMemberForAction.value?.id === row.id) {
+                const updatedMember = rows.value.find(r => r.id === row.id);
+                if (updatedMember) {
+                  selectedMemberForAction.value = updatedMember;
+                }
+              }
               ElementPlus.ElMessage.success(body.message || '更新成功');
             } catch (e) {
               const serverMsg = e?.response?.data?.message;
@@ -632,6 +720,13 @@
               ElementPlus.ElMessage.success(body.message || '续卡成功');
               renewDialogVisible.value = false;
               await loadList(); // 刷新列表
+              // 如果展开面板是打开的，更新选中会员的信息
+              if (memberActionDrawerVisible.value && selectedMemberForAction.value?.id === renewForm.memberId) {
+                const updatedMember = rows.value.find(r => r.id === renewForm.memberId);
+                if (updatedMember) {
+                  selectedMemberForAction.value = updatedMember;
+                }
+              }
             } catch (e) {
               const serverMsg = e?.response?.data?.message;
               ElementPlus.ElMessage.error(serverMsg || e?.message || String(e));
@@ -875,13 +970,16 @@
           // 在 Vue 3 中，props 会自动暴露到 this 上，也可以通过 this.$props 访问
           const currentUser = this.$props?.currentUser || {};
 
-          return h('div', { class: 'card' }, [
-            h('div', { class: 'toolbar' }, [
-              h('div', { class: 'toolbar-left' }, [
-                h('div', { style: 'font-size: 16px; font-weight: 700;' }, m.title),
-                this.isReadOnly ? h('span', { class: 'muted' }, '（只读）') : null
+          return h('div', { style: 'display: flex; flex-direction: column;' }, [
+            // 页面标题和Total计数
+            h('div', { class: 'page-header' }, [
+              h('div', { class: 'page-title-section' }, [
+                h('div', { class: 'page-title' }, m.title),
+                h('div', { class: 'page-total' }, `Total: ${this.rows.length}`)
               ]),
-              h('div', { class: 'toolbar-left' }, [
+              // 搜索筛选栏
+              h('div', { class: 'toolbar' }, [
+                h('div', { class: 'toolbar-left' }, [
                 ...(m.listParams || []).map(p => {
                   if (p.type === 'month') {
                     return h(ElementPlus.ElDatePicker, {
@@ -1019,12 +1117,14 @@
                     }
                   }, () => '清理过期Session')
                 ] : null)
+                ])
               ])
             ]),
 
             this.errorText ? h(ElementPlus.ElAlert, { type: 'error', title: this.errorText, showIcon: true, closable: true }) : null,
 
-            // 开卡统计汇总信息（仅开卡统计模块显示）
+            // 数据表格区域
+            h('div', { class: 'card', style: 'margin-top: 44px; padding: 2px;' }, [
             (m.key === 'cardSummary' && this.summaryInfo ? h(ElementPlus.ElCard, {
               style: 'margin-top: 12px; margin-bottom: 12px;',
               shadow: 'never'
@@ -1053,6 +1153,7 @@
               ]
             }) : null),
 
+            // 数据表格
             h(ElementPlus.ElTable, {
               data: this.rows,
               stripe: true,
@@ -1060,25 +1161,30 @@
               size: 'default',
               style: 'width: 100%; margin-top: 12px;',
               height: m.tableHeight || undefined,
-              // loading overlay for table
               loading: this.loading,
               rowKey: 'id',
-              // 会员管理模块：添加行点击事件和展开功能
               ...(m.key === 'members' ? {
-                onRowClick: (row) => {
-                  // 如果点击的是已经选中的行，关闭面板
-                  if (this.selectedMemberForAction && row.id === this.selectedMemberForAction.id) {
-                    this.closeMemberActionDrawer();
-                  } else {
-                    this.openMemberActionDrawer(row);
-                  }
-                },
-                rowStyle: { cursor: 'pointer' },
-                expandRowKeys: this.memberActionDrawerVisible && this.selectedMemberForAction 
-                  ? [this.selectedMemberForAction.id] 
-                  : []
-              } : {})
-            }, {
+                  onRowClick: (row) => {
+                    // 如果点击的是已经选中的行，关闭面板
+                    if (this.selectedMemberForAction && row.id === this.selectedMemberForAction.id) {
+                      this.closeMemberActionDrawer();
+                    } else {
+                      this.openMemberActionDrawer(row);
+                    }
+                  },
+                  rowStyle: (row) => {
+                    const baseStyle = { cursor: 'pointer' };
+                    // 如果这行被展开，添加背景色
+                    if (this.selectedMemberForAction && row.id === this.selectedMemberForAction.id) {
+                      return { ...baseStyle, background: 'rgba(239,246,255,0.4)' };
+                    }
+                    return baseStyle;
+                  },
+                  expandRowKeys: this.memberActionDrawerVisible && this.selectedMemberForAction 
+                    ? [this.selectedMemberForAction.id] 
+                    : []
+                } : {})
+              }, {
               default: () => [
                 // 展开面板列（仅会员管理模块）
                 ...(m.key === 'members' ? [h(ElementPlus.ElTableColumn, {
@@ -1089,131 +1195,307 @@
                   default: ({ row }) => {
                     const member = this.selectedMemberForAction;
                     if (!member || member.id !== row.id) return null;
+                    
+                    // 获取员工信息
+                    const employeesList = Array.isArray(this.employees) ? this.employees : [];
+                    const firstEmployee = member.firstEmployee || employeesList.find(e => e.id === member.firstEmployeeId);
+                    const lastEmployee = member.lastEmployee || employeesList.find(e => e.id === member.lastEmployeeId);
+                    
+                    const isPending = member.pendingCardStartDate ? true : false;
+                    const statusText = isPending ? 'PENDING' : (member.status === 1 ? 'ACTIVE' : 'INACTIVE');
+                    const statusColor = isPending ? 'text-slate-500' : (member.status === 1 ? 'text-slate-900' : 'text-red-600');
                       
                     return h('div', {
-                      style: 'padding: 20px; background: #fff;'
+                      style: 'padding: 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; box-shadow: inset 0px 4px 12px rgba(0,0,0,0.02);'
                     }, [
-                      // 标题栏（带关闭按钮）
+                      // 卡片网格布局
                       h('div', {
-                        style: 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #ebeef5;'
+                        style: 'display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-bottom: 24px;'
                       }, [
+                        // 卡片1: 基本信息
                         h('div', {
-                          style: 'font-size: 16px; font-weight: bold; color: #303133;'
-                        }, `会员操作 - ${member.name || ''}`),
-                        h(ElementPlus.ElButton, {
-                          type: 'text',
-                          icon: 'Close',
-                          onClick: () => this.closeMemberActionDrawer(),
-                          style: 'padding: 0;'
-                        })
-                      ]),
-                      
-                      // 内容区域：左侧会员信息，右侧操作按钮
-                      h('div', {
-                        style: 'display: flex; gap: 30px;'
-                      }, [
-                        // 左侧：会员基本信息
-                        h('div', {
-                          style: 'flex: 1;'
+                          style: 'background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);'
                         }, [
-                          h(ElementPlus.ElCard, {
-                            shadow: 'never',
-                            style: 'border: 1px solid #ebeef5;'
-                          }, {
-                            header: () => h('div', { style: 'font-weight: bold; font-size: 14px;' }, '会员信息'),
-                            default: () => h('div', {
-                              style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 16px;'
+                          // 卡片头部
+                          h('div', {
+                            style: 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;'
+                          }, [
+                            h('div', {
+                              style: 'display: flex; align-items: center; gap: 8px;'
                             }, [
-                              h('div', [
-                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '姓名'),
-                                h('div', { style: 'font-size: 14px; font-weight: 500;' }, member.name || '-')
-                              ]),
-                              h('div', [
-                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '手机号'),
-                                h('div', { style: 'font-size: 14px;' }, member.phone || '-')
-                              ]),
-                              h('div', [
-                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '卡种'),
-                                h('div', { style: 'font-size: 14px;' }, member.cardType?.name || '-')
-                              ]),
-                              h('div', [
-                                h('div', { style: 'color: #909399; font-size: 12px; margin-bottom: 4px;' }, '到期日期'),
-                                h('div', { style: 'font-size: 14px;' }, member.expireDate || '-')
-                              ])
+                              h(ElementPlus.ElIcon, { size: 16, style: 'color: #64748b;' }, () => h('User')),
+                              h('div', {
+                                style: 'font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;'
+                              }, '基本信息')
+                            ]),
+                            h('div', {
+                              style: `padding: 2px 8px; border-radius: 4px; background: ${isPending ? '#f1f5f9' : (member.status === 1 ? '#f1f5f9' : '#fee2e2')}; color: ${isPending ? '#64748b' : (member.status === 1 ? '#0f172a' : '#dc2626')}; font-size: 12px; font-weight: 500;`
+                            }, statusText)
+                          ]),
+                          // 头像和姓名
+                          h('div', {
+                            style: 'display: flex; gap: 16px; margin-bottom: 24px; align-items: center;'
+                          }, [
+                            // 头像 (h-20 w-20 = 80px)
+                            h('div', {
+                              style: 'width: 80px; height: 80px; border-radius: 50%; border: 2px solid #f1f5f9; background: #f8fafc; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 32px; color: #94a3b8; font-weight: 600;'
+                            }, (member.name || 'M').charAt(0)),
+                            // 姓名和ID
+                            h('div', {
+                              style: 'flex: 1; min-width: 0;'
+                            }, [
+                              h('div', {
+                                style: 'font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 4px;'
+                              }, member.name || '-'),
+                              h('div', {
+                                style: 'font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; color: #64748b;'
+                              }, `ID: ${member.id || '-'}`)
                             ])
-                          })
+                          ]),
+                          // 分割线
+                          h('div', {
+                            style: 'height: 1px; background: #f1f5f9; margin-bottom: 16px;'
+                          }),
+                          // Key-Value 对
+                          h('div', {
+                            style: 'display: flex; flex-direction: column; gap: 16px;'
+                          }, [
+                            h('div', {
+                              style: 'display: flex; justify-content: space-between; align-items: center;'
+                            }, [
+                              h('div', {
+                                style: 'display: flex; align-items: center; gap: 8px; font-size: 14px; color: #64748b;'
+                              }, [
+                                h(ElementPlus.ElIcon, { size: 16, style: 'color: #64748b;' }, () => h('Phone')),
+                                h('span', null, '手机')
+                              ]),
+                              h('div', {
+                                style: 'font-size: 14px; font-weight: 500; color: #0f172a;'
+                              }, member.phone || '-')
+                            ]),
+                            h('div', {
+                              style: 'height: 1px; background: #f1f5f9;'
+                            }),
+                            h('div', {
+                              style: 'display: flex; justify-content: space-between; align-items: center;'
+                            }, [
+                              h('div', {
+                                style: 'display: flex; align-items: center; gap: 8px; font-size: 14px; color: #64748b;'
+                              }, [
+                                h(ElementPlus.ElIcon, { size: 16, style: 'color: #64748b;' }, () => h('Document')),
+                                h('span', null, '证件')
+                              ]),
+                              h('div', {
+                                style: 'font-size: 14px; font-weight: 500; color: #0f172a; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'
+                              }, member.idCard || '-')
+                            ])
+                          ])
                         ]),
                         
-                        // 右侧：操作按钮
+                        // 卡片2: 会员权益
                         h('div', {
-                          style: 'flex: 0 0 300px;'
+                          style: 'background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);'
                         }, [
+                          // 卡片头部
                           h('div', {
-                            style: 'display: flex; flex-direction: column; gap: 12px;'
+                            style: 'display: flex; align-items: center; gap: 8px; margin-bottom: 24px;'
                           }, [
-                            h(ElementPlus.ElButton, {
-                              type: 'success',
-                              size: 'default',
-                              icon: 'Check',
-                              loading: this.checkinLoading,
-                              onClick: () => {
-                                this.doCheckin(member);
-                              },
-                              style: 'width: 100%;'
-                            }, () => '签到'),
-                            h(ElementPlus.ElButton, {
-                              type: 'warning',
-                              size: 'default',
-                              icon: 'Refresh',
-                              onClick: () => {
-                                this.openRenew(member);
-                                this.closeMemberActionDrawer();
-                              },
-                              style: 'width: 100%;'
-                            }, () => '续卡'),
-                            h(ElementPlus.ElButton, {
-                              type: 'info',
-                              size: 'default',
-                              icon: 'Clock',
-                              onClick: () => {
-                                this.openCheckinHistory(member);
-                                this.closeMemberActionDrawer();
-                              },
-                              style: 'width: 100%;'
-                            }, () => '签到记录'),
-                            h(ElementPlus.ElButton, {
-                              type: 'info',
-                              size: 'default',
-                              icon: 'Document',
-                              onClick: () => {
-                                this.openRenewHistory(member);
-                                this.closeMemberActionDrawer();
-                              },
-                              style: 'width: 100%;'
-                            }, () => '续卡历史'),
-                            this.canUpdate ? h(ElementPlus.ElButton, {
-                              type: 'primary',
-                              size: 'default',
-                              icon: 'Edit',
-                              onClick: () => {
-                                this.openEdit(member);
-                                this.closeMemberActionDrawer();
-                              },
-                              style: 'width: 100%;'
-                            }, () => '编辑') : null,
-                            this.canDelete ? h(ElementPlus.ElButton, {
-                              type: 'danger',
-                              size: 'default',
-                              icon: 'Delete',
-                              onClick: async () => {
-                                await this.doDelete(member);
-                                this.closeMemberActionDrawer();
-                              },
-                              style: 'width: 100%;'
-                            }, () => '删除') : null
-                          ].filter(Boolean))
+                            h(ElementPlus.ElIcon, { size: 16, style: 'color: #64748b;' }, () => h('CreditCard')),
+                            h('div', {
+                              style: 'font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;'
+                            }, '会员权益')
+                          ]),
+                          // 当前卡种和剩余次数（网格布局）
+                          h('div', {
+                            style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px;'
+                          }, [
+                            // 当前卡种
+                            h('div', {
+                              style: 'background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 16px;'
+                            }, [
+                              h('div', {
+                                style: 'font-size: 12px; color: #2563eb; margin-bottom: 8px;'
+                              }, '当前卡种'),
+                              h('div', {
+                                style: 'font-size: 16px; font-weight: 600; color: #1e40af;'
+                              }, member.cardType?.name || '-')
+                            ]),
+                            // 剩余次数
+                            h('div', {
+                              style: 'background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;'
+                            }, [
+                              h('div', {
+                                style: 'font-size: 12px; color: #64748b; margin-bottom: 8px;'
+                              }, '剩余次数'),
+                              h('div', {
+                                style: 'font-size: 16px; font-weight: 600; color: #0f172a;'
+                              }, member.remainingTimes !== null && member.remainingTimes !== undefined ? member.remainingTimes : '-')
+                            ])
+                          ]),
+                          // 分割线
+                          h('div', {
+                            style: 'height: 1px; background: #f1f5f9; margin-bottom: 16px;'
+                          }),
+                          // 有效期至和最近签到
+                          h('div', {
+                            style: 'display: flex; flex-direction: column; gap: 16px;'
+                          }, [
+                            h('div', {
+                              style: 'display: flex; justify-content: space-between; align-items: center;'
+                            }, [
+                              h('div', {
+                                style: 'display: flex; align-items: center; gap: 8px; font-size: 14px; color: #64748b;'
+                              }, [
+                                h(ElementPlus.ElIcon, { size: 16, style: 'color: #64748b;' }, () => h('Calendar')),
+                                h('span', null, '有效期至')
+                              ]),
+                              h('div', {
+                                style: 'font-size: 14px; font-weight: 500; color: #0f172a;'
+                              }, member.expireDate || '-')
+                            ]),
+                            h('div', {
+                              style: 'height: 1px; background: #f1f5f9;'
+                            }),
+                            h('div', {
+                              style: 'display: flex; justify-content: space-between; align-items: center;'
+                            }, [
+                              h('div', {
+                                style: 'display: flex; align-items: center; gap: 8px; font-size: 14px; color: #64748b;'
+                              }, [
+                                h(ElementPlus.ElIcon, { size: 16, style: 'color: #64748b;' }, () => h('Clock')),
+                                h('span', null, '最近签到')
+                              ]),
+                              h('div', {
+                                style: 'font-size: 14px; font-weight: 500; color: #0f172a;'
+                              }, member.lastCheckinTime ? dayjs(member.lastCheckinTime).format('YYYY-MM-DD HH:mm:ss') : '-')
+                            ])
+                          ])
+                        ]),
+                        
+                        // 卡片3: 管理记录
+                        h('div', {
+                          style: 'background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);'
+                        }, [
+                          // 卡片头部
+                          h('div', {
+                            style: 'display: flex; align-items: center; gap: 8px; margin-bottom: 24px;'
+                          }, [
+                            h(ElementPlus.ElIcon, { size: 16, style: 'color: #64748b;' }, () => h('Document')),
+                            h('div', {
+                              style: 'font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;'
+                            }, '管理记录')
+                          ]),
+                          // 首次开卡和最后更新
+                          h('div', {
+                            style: 'display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;'
+                          }, [
+                            // 首次开卡
+                            h('div', [
+                              h('div', {
+                                style: 'font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;'
+                              }, '首次开卡'),
+                              h('div', {
+                                style: 'display: flex; align-items: center; gap: 8px;'
+                              }, [
+                                h('div', {
+                                  style: 'width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0;'
+                                }),
+                                h('div', {
+                                  style: 'font-size: 14px; font-weight: 500; color: #0f172a;'
+                                }, firstEmployee?.name || '系统管理员')
+                              ])
+                            ]),
+                            // 最后更新
+                            h('div', [
+                              h('div', {
+                                style: 'font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;'
+                              }, '最后更新'),
+                              h('div', {
+                                style: 'display: flex; align-items: center; gap: 8px;'
+                              }, [
+                                h('div', {
+                                  style: 'width: 8px; height: 8px; border-radius: 50%; background: #93c5fd; flex-shrink: 0;'
+                                }),
+                                h('div', {
+                                  style: 'font-size: 14px; font-weight: 500; color: #0f172a;'
+                                }, lastEmployee?.name || '系统管理员')
+                              ])
+                            ])
+                          ]),
+                          // 分割线
+                          h('div', {
+                            style: 'height: 1px; background: #f1f5f9; margin-bottom: 16px;'
+                          }),
+                          // 未生效卡种
+                          h('div', [
+                            h('div', {
+                              style: 'font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;'
+                            }, '未生效卡种'),
+                            h('div', {
+                              style: 'font-size: 14px; color: #94a3b8;'
+                            }, member.pendingCardStartDate 
+                              ? `${member.pendingCardType?.name || '未知卡种'} ${member.pendingCardStartDate} 至 ${member.pendingCardExpireDate || ''}`
+                              : '-')
+                          ])
                         ])
-                      ])
+                      ]),
+                      
+                      // 底部操作按钮区域
+                      h('div', {
+                        style: 'display: flex; gap: 12px; flex-wrap: wrap;'
+                      }, [
+                        // 续费/充值（主按钮）
+                        h(ElementPlus.ElButton, {
+                          type: 'primary',
+                          style: 'height: 36px; padding: 0 16px; background: #2563eb; border: none; color: #ffffff; font-size: 14px; font-weight: 500;',
+                          icon: 'CreditCard',
+                          onClick: () => {
+                            this.openRenew(member);
+                          }
+                        }, () => '续费/充值'),
+                        // 编辑资料
+                        h(ElementPlus.ElButton, {
+                          style: 'height: 36px; padding: 0 16px; background: #ffffff; border: 1px solid #cbd5e1; color: #475569; font-size: 14px; font-weight: 500;',
+                          icon: 'Edit',
+                          onClick: () => {
+                            this.openEdit(member);
+                          }
+                        }, () => '编辑资料'),
+                        // 签到记录
+                        h(ElementPlus.ElButton, {
+                          style: 'height: 36px; padding: 0 16px; background: #ffffff; border: 1px solid #cbd5e1; color: #475569; font-size: 14px; font-weight: 500;',
+                          icon: 'Clock',
+                          onClick: () => {
+                            this.openCheckinHistory(member);
+                          }
+                        }, () => '签到记录'),
+                        // 续卡历史
+                        h(ElementPlus.ElButton, {
+                          style: 'height: 36px; padding: 0 16px; background: #ffffff; border: 1px solid #cbd5e1; color: #475569; font-size: 14px; font-weight: 500;',
+                          icon: 'Document',
+                          onClick: () => {
+                            this.openRenewHistory(member);
+                          }
+                        }, () => '续卡历史'),
+                        // 签到按钮
+                        h(ElementPlus.ElButton, {
+                          style: 'height: 36px; padding: 0 16px; background: #ffffff; border: 1px solid #cbd5e1; color: #475569; font-size: 14px; font-weight: 500;',
+                          icon: 'Check',
+                          loading: this.checkinLoading,
+                          onClick: () => {
+                            this.doCheckin(member);
+                          }
+                        }, () => '签到'),
+                        // 删除按钮（如果有权限）
+                        this.canDelete ? h(ElementPlus.ElButton, {
+                          style: 'height: 36px; padding: 0 16px; background: #ffffff; border: 1px solid #fca5a5; color: #dc2626; font-size: 14px; font-weight: 500;',
+                          icon: 'Delete',
+                          onClick: async () => {
+                            await this.doDelete(member);
+                            this.closeMemberActionDrawer();
+                          }
+                        }, () => '删除会员') : null
+                      ].filter(Boolean))
                     ]);
                   }
                 })] : []),
@@ -1310,6 +1592,7 @@
                 }) : null)
               ].filter(Boolean)
             }),
+            ]),
 
             h(ElementPlus.ElDialog, {
               modelValue: this.createDialogVisible,
@@ -2297,12 +2580,12 @@
 
             h(ElementPlus.ElContainer, null, () => [
               h(ElementPlus.ElHeader, { class: 'header' }, () => [
-                h('div', { style: 'display:flex; gap:10px; align-items:center;' }, [
-                  h('div', { style: 'font-weight:700;' }, this.activeModule.title),
+                h('div', { class: 'header-title' }, [
+                  h('div', { class: 'header-title-main' }, this.activeModule.title),
                   h('span', { class: 'muted' }, 'BaseURL: '),
                   h('span', { class: 'mono muted' }, 'http://localhost:8080')
                 ]),
-                h('div', { style: 'display:flex; gap:10px; align-items:center;' }, [
+                h('div', { class: 'header-right' }, [
                   h(ElementPlus.ElTag, { type: this.tokenPresent ? 'success' : 'info' }, () => this.userLabel),
                   !this.tokenPresent
                           ? h(ElementPlus.ElButton, { type: 'primary', onClick: this.openLogin }, () => '登录')
